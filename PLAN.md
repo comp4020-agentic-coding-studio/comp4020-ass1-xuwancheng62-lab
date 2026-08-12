@@ -976,6 +976,210 @@ copy, the one-shared-area structure, the separate `IMPROVED_ALGORITHMS` registry
 the 20-run sample size, and the array length of 16. No Bogo Sort, and the dead
 CSS transition still stays.
 
+## Amendment 7 — V1.7: cut the copy, unify the two tables (13 August 2026)
+
+The brief, in your words: add a small tolerance to the average-comparison tint so
+noise-sized differences stay neutral, keep the averages and the win/tie/loss
+counts exactly as they are, then stop adding features and do a clarity pass.
+Main priority: **there is too much text.** Cut explanatory copy aggressively while
+preserving the important caveats, and let the animation, the statistics and the
+cards carry the explanation. Keep the story obvious — Race → Statistics → What we
+found → Original vs Improved — unify the two statistics sections visually, and
+finish with a desktop and mobile UX check. Proposals first, no edits.
+
+### How much text there actually is
+
+Counted, not estimated (`index.html` plus the `IMPROVEMENTS` strings):
+
+| block | words |
+| --- | --- |
+| intro paragraph | 56 |
+| variant note by the controls | 23 |
+| statistics intro paragraph | 53 |
+| statistics caption | 91 |
+| `#variant-detail` note | 138 |
+| findings intro paragraph | 64 |
+| improvement placeholder line | 15 |
+| comparison caption | 9 |
+| **static total** | **449** |
+| four card findings | 111 |
+| four "what changed" lines | 74 |
+| four expectation paragraphs | 189 |
+| **improvement total** | **374** |
+
+A reader at the improvement section has about **650 words** on screen at once, for
+a page whose argument is meant to be the moving bars and two tables. The target
+below is ~330, roughly half, with every caveat still on the page.
+
+### The tint tolerance, measured first
+
+4,000 independent samples of 20 arrays per cell, recording
+`improvedAverage - originalAverage` at the one decimal the page displays:
+
+| cell | mean | p1 | p99 | max abs | inside ±1.5 | ±2.5 | ±3 | ±5 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| bubble/random | −6.47 | −10.70 | −3.30 | 13.50 | 0% | 0% | 0% | 17% |
+| bubble/nearlySorted | −52.49 | −68.70 | −35.70 | 75.00 | 0% | 0% | 0% | 0% |
+| bubble/nearlyReversed | −0.01 | −0.10 | 0.00 | 0.20 | 100% | 100% | 100% | 100% |
+| insertion/random | −27.62 | −33.00 | −22.40 | 35.30 | 0% | 0% | 0% | 0% |
+| insertion/nearlySorted | +15.64 | +13.20 | +17.90 | 19.00 | 0% | 0% | 0% | 0% |
+| insertion/nearlyReversed | −66.73 | −68.80 | −64.30 | 70.00 | 0% | 0% | 0% | 0% |
+| merge/random | +9.57 | +8.40 | +10.60 | 11.20 | 0% | 0% | 0% | 0% |
+| merge/nearlySorted | −4.80 | −7.20 | −2.60 | 8.10 | 0% | 1% | 3% | 57% |
+| merge/nearlyReversed | +14.02 | +13.60 | +14.40 | 14.60 | 0% | 0% | 0% | 0% |
+| quick/random | −0.04 | −5.20 | +5.30 | 7.40 | 47% | 73% | 81% | 97% |
+| quick/nearlySorted | −43.67 | −52.40 | −34.20 | 55.80 | 0% | 0% | 0% | 0% |
+| quick/nearlyReversed | −39.83 | −49.40 | −29.80 | 52.80 | 0% | 0% | 0% | 0% |
+
+**Proposed: ±2.5 comparisons.** Inside that band the row is neutral. It catches
+73% of quick/random draws and mistints merge/nearlySorted's real 4.8-comparison
+saving as "no difference" in 1% of them. Ten of the twelve cells are 8 to 67
+comparisons from zero and are unaffected at any band under 8.
+
+**What the tolerance does not fix, stated plainly.** At 20 arrays quick/random's
+spread is about ±5 — wider than merge/nearlySorted's genuine 4.8 saving. So no
+fixed band both neutralises quick/random every time and keeps merge's finding:
+about one draw in four of quick/random will still be marked. Widening to ±5 would
+buy 97% there and destroy merge's row 57% of the time, which is the wrong trade —
+erasing a real finding to tidy a noisy one. The rest of the fix is the copy edit
+in the next section: quick's expectation line currently promises "at no cost in
+comparisons", and that sentence, not the tint, is what a marked row contradicts.
+
+### The cuts, block by block
+
+Each is "keep the caveat, drop the restatement". Proposed replacement text in
+full, so this is approvable as written rather than in principle.
+
+1. **Intro, 56 → 29.** "Bubble, insertion, merge and quick sort all solve the
+   same problem: put these bars in order. Pick two, press Race, and count the
+   work. Then change the starting data." Dropped: "same bars, same starting
+   array, wildly different amounts of work" (the two panels show it) and "watch
+   the winner change with it" (the statistics section proves it).
+2. **Variant note by the controls, 23 → 23, unchanged.** This is the honesty rail
+   required by CLAUDE.md — the variant label travelling with the number — and it
+   is already one line.
+3. **Statistics intro, 53 → 12.** Cut to the one clause that is the reason the
+   section exists: "One race is one array, and a lucky array flatters an
+   algorithm." Dropped: the description of what the button does (the button says
+   it) and the read-down-a-column / read-across-a-row instructions (the table's
+   headers say it).
+4. **Statistics caption, 91 → 57.** "Big number: average comparisons over that
+   column's 20 arrays. Small number: how many of those 20 it used the fewest on —
+   ties count for each, so a column can total more than 20. All four algorithms
+   get the identical 20 arrays within a column. Comparisons only: not time, not
+   memory, and not a claim about longer arrays." Every caveat kept: identical
+   arrays, ties inflating a column, comparisons-only, no extrapolation. Dropped:
+   "between columns the arrays differ, which is what a starting shape is".
+5. **`#variant-detail`, 138 → 68.** "Two columns say more about our code than
+   about the algorithms. **Bubble sort** here has no early exit, so it makes the
+   same 120 comparisons whatever the data. **Quick sort** takes the last value as
+   its pivot, which is why it does more work on nearly-ordered data than on
+   random. Insertion and merge are the ordinary versions. Both can be repaired —
+   [the section below races the repairs](#improve)." Kept: both variant
+   confessions, the ordinary-version note, the link. Dropped: the "still lands
+   third of the four, so the flat 120 is our fault and the low ranking mostly
+   isn't" qualification — 34 words that the improvement section now demonstrates.
+6. **Findings intro, 64 → 35.** "We fixed all four and raced each fix against its
+   own original on the same arrays. Two of the four average worse on some starting
+   shapes: an improvement is only an improvement for particular data."
+7. **Improvement placeholder, 15 → 7.** "Original against improved, from the
+   identical array."
+8. **Card findings, 111 → 49.** One clause each, since the card is a button and
+   the table underneath carries the numbers: bubble "Never responds to its data —
+   the same average in all three columns."; insertion "The widest swing on the
+   page: best on nearly-sorted, nearly the worst on nearly-reversed."; merge "The
+   steadiest and least adaptive: barely notices random from nearly-sorted."; quick
+   "Worse on nearly-sorted input than on random, which is backwards."
+9. **"What changed" lines, 74 → 74, unchanged.** This is the one sentence of
+   mechanism per card, and without it "improved" is a label a reader has to trust.
+10. **Expectation paragraphs, 189 → 88.** They now sit directly above a table that
+    shows the same thing three shapes at a time, so each keeps only what the table
+    cannot show:
+    - bubble: "Never costs more than the original: a large saving on nearly-sorted
+      input and none at all on nearly-reversed, where a value still moves one
+      place per pass." (the reason `0 / 20 / 0` is not a failure)
+    - insertion: "Gives up the early break that made it the nearly-sorted
+      champion, and gets a near-constant cost on any input in exchange."
+    - merge: "Little room to win: no comparison sort can beat 45 comparisons for
+      16 items, and merge sort is already close." (the information-theoretic
+      floor, which appears nowhere else on the page)
+    - quick: "Improves the expected case, not the worst: a random pivot can still
+      split badly, but no starting shape can force it." (drops "unchanged on
+      random, at no cost in comparisons" — the sentence that contradicts a marked
+      random row)
+11. **Comparison caption, 9 → 16.** Adds the tolerance as a caveat: "Won / tied /
+    lost counts arrays, not comparisons. Differences under 2.5 comparisons are
+    left unmarked."
+12. **Headings.** "What we found — does the improvement help?" → "What we found".
+    The statistics heading stays a question. No heading is added for the race: the
+    `h1` and the Race button are the section's label.
+
+Static 449 → 205; improvement copy 374 → 211; on screen at the improvement
+section ~650 → ~330.
+
+### Unifying the two tables — two options, one recommended
+
+They are the same kind of object (measured averages over 20 arrays) drawn two
+different ways: the statistics matrix has a big average with a small count under
+it and a blue "fewest here" cell highlight; the comparison has four flat columns
+and green/red row tints. Two visual languages for one idea.
+
+- **Option A, skeleton only.** One shared class for both tables: identical font
+  scale, numeric column widths, caption format, header weight. Keeps the four
+  columns and the green/red rows. Smallest change, and the page still carries two
+  highlight vocabularies.
+- **Option B, recommended — same cell anatomy, same highlight.** Three columns
+  instead of four: Starting data, Original, Improved, with `19 / 0 / 1` as the
+  small line under the Improved average, exactly where the statistics matrix puts
+  its win count. The lower of the two averages gets the matrix's existing blue
+  `data-fewest` highlight; inside the ±2.5 tolerance neither is marked. All three
+  counts stay, unchanged, in the same row.
+
+  Why it is better than A: the finding becomes the highlight moving between the
+  Original and Improved columns as you read down the three shapes — the same
+  idiom the matrix already uses across its columns, with a comment in `styles.css`
+  already saying so. It drops a colour language rather than adding one, drops
+  green/red (which carries no meaning for a red–green colour-blind reader, and
+  this page has no legend for it), and drops a column at 390px, where the shape
+  names currently wrap to two lines.
+
+  What it costs, out loud: it retires the row tints and the `data-direction`
+  background rules committed an hour ago in `ad4ddc1`, and rewrites three of the
+  DOM tests from that commit (the tint assertion, the three-cells-per-row
+  assertion, and the shipped-markup header check). `data-direction` stays on the
+  row as the tested contract for the tolerance; it just drives which cell is
+  highlighted instead of a row colour. It also relocates the win/tie/loss triple
+  from its own column to a line under the Improved average — the three numbers you
+  asked for are all still there and still unchanged, but if a separate column was
+  the point, say so and I will do Option A instead.
+
+### The story order
+
+Race → Statistics → What we found → Original vs Improved is already the DOM
+order, and nothing moves. What makes it hard to see is volume, not sequence: 449
+words of connective prose between four interactive things. The cuts above are the
+fix. The one structural tidy proposed: the findings section's heading drops its
+subclause so the four section labels read as a sequence — "Sorting race", "Does
+the winner hold when the data changes?", "What we found", and the chosen card's
+own heading.
+
+### Machine-checked vs. judgement, this amendment
+
+- **Machine-checked:** the tolerance is neutral within ±2.5 and directional
+  outside it, asserted on constructed averages rather than sampled ones so it
+  cannot flake; bubble/nearlyReversed stays neutral and the nine large cells stay
+  directional at 20 arrays; every card's copy still names its own variant; the
+  `#variant-detail` link still resolves to the improvement section; both tables
+  still render one row per shape or algorithm; the win/tie/loss triple still sums
+  to 20 wherever it is drawn; no measured number changes.
+- **Judgement, yours:** whether the shortened copy still explains enough, whether
+  the blue-highlight table reads as clearly as the tinted one, and whether the
+  four headings now read as a story.
+- **Explicitly unchanged:** every algorithm, every generator, both input
+  generators, the comparison metric, all sample sizes, the array length, the two
+  registries, the speed sliders, the shape selector's scope, and every number the
+  page reports.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
