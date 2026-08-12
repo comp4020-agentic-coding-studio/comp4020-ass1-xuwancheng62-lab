@@ -578,13 +578,6 @@ export const SHAPE_LABELS: Record<ShapeKey, string> = {
   nearlyReversed: "Nearly reversed",
 };
 
-/** How the statistics run describes each shape in the table's scope line. */
-export const SHAPE_DESCRIPTIONS: Record<ShapeKey, string> = {
-  random: "random shuffles",
-  nearlySorted: "nearly-sorted arrays",
-  nearlyReversed: "nearly-reversed arrays",
-};
-
 /** How many values the two "nearly" shapes knock out of place. */
 const DISPLACEMENTS = 2;
 

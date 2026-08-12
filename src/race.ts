@@ -4,7 +4,6 @@ import {
   IMPROVED_ALGORITHMS,
   IMPROVEMENTS,
   INPUT_SHAPES,
-  SHAPE_DESCRIPTIONS,
   SHAPE_LABELS,
   SORT_ALGORITHMS,
   averageDirection,
@@ -130,11 +129,12 @@ export function initRace(root: ParentNode): void {
 
   // Every shape, always, so the sentence matches the table's three columns.
   // Amendment 4: this used to name only the selected shape, back when the table
-  // showed one condition at a time.
+  // showed one condition at a time. Amendment 7 stopped it listing the three
+  // shapes by name -- they are the column headings a centimetre above it, and
+  // spelling them out ran this caption to eight lines on a phone. The array
+  // length stays: it is stated nowhere else, and it is the limit on the claim.
   function describeStatsScope(): void {
-    const shapes = SHAPE_KEYS.map((shape) => `${STATS_RUNS} ${SHAPE_DESCRIPTIONS[shape]}`);
-    const listed = `${shapes.slice(0, -1).join(", ")} and ${shapes.at(-1)}`;
-    statsScope!.textContent = `Comparisons made on ${listed}, every array ${ARRAY_LENGTH} items long.`;
+    statsScope!.textContent = `${STATS_RUNS} arrays of each shape, every array ${ARRAY_LENGTH} items long.`;
   }
 
   // The selector is the race's condition only. It deliberately leaves the

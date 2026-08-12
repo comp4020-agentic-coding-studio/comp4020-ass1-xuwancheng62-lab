@@ -266,6 +266,16 @@ a {
   width: 22%;
 }
 
+/* The comparison has two number columns where the statistics matrix has three,
+   so 22% each left 56% of the table as an empty row-label column and pushed the
+   two numbers being compared apart. Measured at 1920: 478px of label against
+   two 188px columns; at 30% they sit as a pair. Same rule, adjusted for the
+   shape of the table rather than a second set of cell styles. */
+.improve .matrix thead th:not(:first-child),
+.improve .matrix tbody td {
+  width: 30%;
+}
+
 /* The average is the number being compared across columns, so it gets the size;
    the win count is the same fact at lower resolution and sits under it. */
 .matrix .avg {
