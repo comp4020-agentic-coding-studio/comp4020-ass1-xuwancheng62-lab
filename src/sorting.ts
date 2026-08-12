@@ -1,4 +1,4 @@
-export type AlgorithmKey = "bubble" | "merge" | "quick";
+export type AlgorithmKey = "bubble" | "insertion" | "merge" | "quick";
 
 export interface SortStep {
   array: number[];
@@ -34,6 +34,29 @@ function* bubbleSort(input: number[]): SortGenerator {
       }
       // Always an adjacent pair: that crawl is bubble sort's whole strategy.
       yield { array: [...arr], comparisons, compared: [j, j + 1] };
+    }
+  }
+  return { array: [...arr], comparisons };
+}
+
+function* insertionSort(input: number[]): SortGenerator {
+  const arr = [...input];
+  let comparisons = 0;
+  for (let i = 1; i < arr.length; i++) {
+    // Walks the new value down with adjacent swaps. The textbook version saves
+    // the value to a variable and shifts the others right, which leaves its old
+    // slot holding a copy -- a frame showing the same value twice, which is the
+    // defect Amendment 1 fixed in merge sort. Swapping is permutation-safe at
+    // every frame and makes exactly the same comparisons.
+    for (let j = i - 1; j >= 0; j--) {
+      comparisons++;
+      const alreadyInPlace = arr[j] <= arr[j + 1];
+      if (!alreadyInPlace) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+      }
+      yield { array: [...arr], comparisons, compared: [j, j + 1] };
+      // Stopping early is why insertion beats our bubble sort on comparisons.
+      if (alreadyInPlace) break;
     }
   }
   return { array: [...arr], comparisons };
@@ -130,15 +153,61 @@ function* quickSort(input: number[]): SortGenerator {
 
 export const SORT_ALGORITHMS: Record<AlgorithmKey, (input: number[]) => SortGenerator> = {
   bubble: bubbleSort,
+  insertion: insertionSort,
   merge: mergeSort,
   quick: quickSort,
 };
 
 export const ALGORITHM_LABELS: Record<AlgorithmKey, string> = {
   bubble: "Bubble sort",
+  insertion: "Insertion sort",
   merge: "Merge sort",
   quick: "Quick sort",
 };
+
+export interface AlgorithmStats {
+  algorithm: AlgorithmKey;
+  averageComparisons: number;
+  /** Runs where this algorithm used the fewest comparisons; ties count for all. */
+  fewestWins: number;
+}
+
+/**
+ * Total comparisons for one algorithm on one input, by running the same
+ * generator the animation uses so there is one definition of "a comparison".
+ */
+export function countComparisons(algorithm: AlgorithmKey, input: number[]): number {
+  const generator = SORT_ALGORITHMS[algorithm](input);
+  let result = generator.next();
+  while (!result.done) result = generator.next();
+  return result.value.comparisons;
+}
+
+/**
+ * Comparison counts for every algorithm across a shared set of inputs. Takes the
+ * inputs rather than generating them so this is deterministic under test, and so
+ * every algorithm provably sees the identical arrays.
+ */
+export function comparisonStats(inputs: number[][]): AlgorithmStats[] {
+  const keys = Object.keys(SORT_ALGORITHMS) as AlgorithmKey[];
+  const totals = new Map<AlgorithmKey, number>(keys.map((key) => [key, 0]));
+  const wins = new Map<AlgorithmKey, number>(keys.map((key) => [key, 0]));
+
+  for (const input of inputs) {
+    const counts = keys.map((key) => ({ key, count: countComparisons(key, input) }));
+    const fewest = Math.min(...counts.map((entry) => entry.count));
+    for (const { key, count } of counts) {
+      totals.set(key, totals.get(key)! + count);
+      if (count === fewest) wins.set(key, wins.get(key)! + 1);
+    }
+  }
+
+  return keys.map((algorithm) => ({
+    algorithm,
+    averageComparisons: inputs.length === 0 ? 0 : totals.get(algorithm)! / inputs.length,
+    fewestWins: wins.get(algorithm)!,
+  }));
+}
 
 export function shuffledRange(length: number): number[] {
   const values = Array.from({ length }, (_, i) => i + 1);

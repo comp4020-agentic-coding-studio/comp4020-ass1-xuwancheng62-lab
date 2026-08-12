@@ -15,8 +15,8 @@
     <main>
       <h1>Sorting race</h1>
       <p>
-        Bubble, merge and quick sort all solve the same problem: put these
-        bars in order, shortest to tallest. Pick one for each side, press
+        Bubble, insertion, merge and quick sort all solve the same problem: put
+        these bars in order, shortest to tallest. Pick one for each side, press
         <strong>Race</strong>, and watch how differently they get there —
         same bars, same shuffle, wildly different amounts of work.
       </p>
@@ -24,6 +24,19 @@
       <div class="controls">
         <button type="button" data-testid="shuffle-button">New shuffle</button>
         <button type="button" data-testid="race-button">Race</button>
+        <span class="speed">
+          <label for="speed-slider">Speed</label>
+          <span aria-hidden="true">Slow</span>
+          <input
+            id="speed-slider"
+            type="range"
+            min="2"
+            max="50"
+            value="10"
+            data-testid="speed-slider"
+          />
+          <span aria-hidden="true">Fast</span>
+        </span>
       </div>
 
       <p class="legend">
@@ -56,6 +69,33 @@
           </p>
         </section>
       </div>
+
+      <section class="stats">
+        <h2>Compare all four over many shuffles</h2>
+        <p>
+          One race is one shuffle, and a lucky shuffle can flatter an algorithm.
+          This runs all four over the same 20 random arrays and counts their
+          comparisons.
+        </p>
+        <button type="button" data-testid="stats-button">Run 20 shuffles</button>
+        <table>
+          <caption>
+            Comparisons made on 20 random shuffles of 16 items. This counts
+            comparisons only — it is not a measure of wall-clock speed or
+            memory, and it says nothing about larger arrays or
+            already-partly-sorted ones. A run counts for every algorithm tied
+            for fewest, so the last column can add up to more than 20.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Algorithm</th>
+              <th scope="col">Average comparisons</th>
+              <th scope="col">Runs with the fewest</th>
+            </tr>
+          </thead>
+          <tbody data-testid="stats-body"></tbody>
+        </table>
+      </section>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>

@@ -21,7 +21,12 @@ a {
   margin: 1.5rem 0;
 }
 
-.controls button {
+/* One button style for both the race controls and the statistics button.
+   Written as one rule rather than two because stylelint's
+   no-descending-specificity rule wants the plain selectors ahead of the
+   :disabled ones, and duplicating them would put .stats button after. */
+.controls button,
+.stats button {
   font-size: 1rem;
   padding: 0.5rem 1.25rem;
   border: 1px solid #1a1a1a;
@@ -30,7 +35,8 @@ a {
   cursor: pointer;
 }
 
-.controls button:disabled {
+.controls button:disabled,
+.stats button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -38,6 +44,20 @@ a {
 .controls button[data-testid="race-button"] {
   background: #1a1a1a;
   color: #fff;
+}
+
+/* The slider stays enabled while the buttons are disabled mid-race, because
+   changing the speed of a running race is the point of it. */
+.speed {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.speed input {
+  width: 7rem;
 }
 
 .panels {
@@ -149,6 +169,45 @@ a {
 
 .status output {
   font-weight: 600;
+}
+
+.stats {
+  margin-top: 2.5rem;
+  border-top: 1px solid #ddd;
+  padding-top: 1.5rem;
+}
+
+.stats h2 {
+  font-size: 1.1rem;
+}
+
+.stats table {
+  width: 100%;
+  margin-top: 1.5rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+/* caption-side: bottom reads as a footnote to the numbers rather than a
+   heading above them, which is what this qualifying text is. */
+.stats caption {
+  caption-side: bottom;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #555;
+  text-align: left;
+}
+
+.stats th,
+.stats td {
+  border-bottom: 1px solid #eee;
+  padding: 0.4rem 0.5rem;
+}
+
+.stats tbody tr[data-fewest="true"] {
+  font-weight: 600;
+  color: #0b5fff;
 }
 
 @media (width <= 640px) {

@@ -1,15 +1,18 @@
 import {
   ALGORITHM_LABELS,
   SORT_ALGORITHMS,
+  comparisonStats,
   shuffledRange,
   type AlgorithmKey,
   type SortStep,
 } from "./sorting";
 
 const ARRAY_LENGTH = 16;
-// 100ms, not the 30ms of V1: a highlighted comparison needs to stay on screen
-// long enough to read as "those two, specifically".
-const STEP_MS = 100;
+// 100ms: a highlighted comparison needs to stay on screen long enough to read
+// as "those two, specifically". Now the slider's default rather than a fixed
+// value -- 10 steps per second.
+const DEFAULT_STEP_MS = 100;
+const STATS_RUNS = 20;
 const PANEL_IDS = ["a", "b"] as const;
 type PanelId = (typeof PANEL_IDS)[number];
 
@@ -62,12 +65,23 @@ export function initRace(root: ParentNode): void {
   const panels = { a: getPanelRefs(root, "a"), b: getPanelRefs(root, "b") };
   const shuffleButton = root.querySelector<HTMLButtonElement>('[data-testid="shuffle-button"]');
   const raceButton = root.querySelector<HTMLButtonElement>('[data-testid="race-button"]');
-  if (!shuffleButton || !raceButton) {
+  const speedSlider = root.querySelector<HTMLInputElement>('[data-testid="speed-slider"]');
+  const statsButton = root.querySelector<HTMLButtonElement>('[data-testid="stats-button"]');
+  const statsBody = root.querySelector<HTMLElement>('[data-testid="stats-body"]');
+  if (!shuffleButton || !raceButton || !speedSlider || !statsButton || !statsBody) {
     throw new Error("race controls are missing required markup");
   }
 
   let sharedArray: number[] = [];
   let racing = false;
+
+  // The slider is read at schedule time rather than captured when the race
+  // starts, which is what lets it take effect mid-race without restarting
+  // anything. Its value is steps per second, so dragging right is faster.
+  function currentStepMs(): number {
+    const rate = Number(speedSlider!.value);
+    return Number.isFinite(rate) && rate > 0 ? 1000 / rate : DEFAULT_STEP_MS;
+  }
 
   function shuffle(): void {
     if (racing) return;
@@ -83,7 +97,7 @@ export function initRace(root: ParentNode): void {
   // Pulls one comparison at a time from the algorithm's generator, redraws,
   // then schedules the next pull with setTimeout so both panels animate
   // side by side instead of one sort finishing before the other starts.
-  function runPanel(panel: PanelRefs, algorithm: AlgorithmKey, onDone: () => void): void {
+  function runPanel(panel: PanelRefs, algorithm: AlgorithmKey, onDone: (comparisons: number) => void): void {
     const generator = SORT_ALGORITHMS[algorithm]([...sharedArray]);
 
     function step(): void {
@@ -92,10 +106,10 @@ export function initRace(root: ParentNode): void {
       panel.counter.textContent = String(result.value.comparisons);
       if (result.done) {
         panel.section.dataset.sorted = "true";
-        onDone();
+        onDone(result.value.comparisons);
         return;
       }
-      setTimeout(step, STEP_MS);
+      setTimeout(step, currentStepMs());
     }
     step();
   }
@@ -105,8 +119,8 @@ export function initRace(root: ParentNode): void {
     racing = true;
     shuffleButton!.disabled = true;
     raceButton!.disabled = true;
-    let finished = 0;
-    let winnerDeclared = false;
+    statsButton!.disabled = true;
+    const totals = new Map<PanelId, number>();
 
     for (const panel of Object.values(panels)) {
       delete panel.section.dataset.sorted;
@@ -116,19 +130,54 @@ export function initRace(root: ParentNode): void {
     for (const id of PANEL_IDS) {
       const panel = panels[id];
       const algorithm = panel.select.value as AlgorithmKey;
-      runPanel(panel, algorithm, () => {
-        if (!winnerDeclared) {
-          winnerDeclared = true;
-          panel.section.dataset.winner = "true";
+      runPanel(panel, algorithm, (comparisons) => {
+        totals.set(id, comparisons);
+        if (totals.size < PANEL_IDS.length) return;
+
+        // The winner is whoever used the fewest comparisons, not whoever
+        // finished animating first. Frame count differs from comparison count
+        // (merge and quick emit frames that compare nothing), so the two
+        // disagreed on about a fifth of merge-vs-quick races -- see PLAN.md
+        // Amendment 2. A tie marks both rather than inventing a tiebreak.
+        const fewest = Math.min(...totals.values());
+        for (const [panelId, count] of totals) {
+          if (count === fewest) panels[panelId].section.dataset.winner = "true";
         }
-        finished++;
-        if (finished === PANEL_IDS.length) {
-          racing = false;
-          shuffleButton!.disabled = false;
-          raceButton!.disabled = false;
-        }
+
+        racing = false;
+        shuffleButton!.disabled = false;
+        raceButton!.disabled = false;
+        statsButton!.disabled = false;
       });
     }
+  }
+
+  function runStats(): void {
+    const inputs = Array.from({ length: STATS_RUNS }, () => shuffledRange(ARRAY_LENGTH));
+    const rows = comparisonStats(inputs);
+    const fewest = Math.min(...rows.map((row) => row.averageComparisons));
+
+    statsBody!.replaceChildren(
+      ...rows.map((row) => {
+        const tr = document.createElement("tr");
+        tr.dataset.algorithm = row.algorithm;
+        if (row.averageComparisons === fewest) tr.dataset.fewest = "true";
+
+        const name = document.createElement("th");
+        name.scope = "row";
+        name.textContent = ALGORITHM_LABELS[row.algorithm];
+
+        const average = document.createElement("td");
+        average.dataset.testid = `stats-average-${row.algorithm}`;
+        average.textContent = row.averageComparisons.toFixed(1);
+
+        const wins = document.createElement("td");
+        wins.textContent = String(row.fewestWins);
+
+        tr.append(name, average, wins);
+        return tr;
+      }),
+    );
   }
 
   for (const id of PANEL_IDS) {
@@ -145,5 +194,8 @@ export function initRace(root: ParentNode): void {
 
   shuffleButton.addEventListener("click", shuffle);
   raceButton.addEventListener("click", race);
+  // No listener for the slider: currentStepMs() reads it when scheduling the
+  // next frame, so a mid-race drag is picked up by the next step on its own.
+  statsButton.addEventListener("click", runStats);
   shuffle();
 }
