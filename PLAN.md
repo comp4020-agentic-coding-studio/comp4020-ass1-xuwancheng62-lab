@@ -1180,6 +1180,251 @@ own heading.
   registries, the speed sliders, the shape selector's scope, and every number the
   page reports.
 
+## Amendment 8 — V1.8: findings before improvements (13 August 2026)
+
+The brief, in your words: improve the "What we found" hierarchy. Drop the intro
+sentence about fixing and racing — that belongs to Improvements, not Findings.
+Each card shows the finding first, then the proposed improvement (`Bubble: doesn't
+adapt to input → Try: early exit`, and the three equivalents). The cards answer
+"what did we discover?" before "what could we change?", and clicking one still
+opens the improvement race. Then a final UI cleanup: simplify the remaining long
+explanatory text to what is needed to read the results; give bars already in their
+final sorted position a distinct colour, the same one in both races; transpose each
+improvement table so Original/Improved are rows and the three shapes are columns,
+matching the main statistics table; and make the four section headings consistent
+and concise — **Race, Statistics, What we found, Improvements**.
+
+Nothing here changes an algorithm, a sample size, the comparison metric or any
+measured number. It changes the page's structure, one visual rule, and the copy.
+
+### Two claims that had to be measured before they could be written
+
+**1. "Merge: most stable across input shapes" is false as literally stated.** Mean
+of the 20-array average, 2,000 samples per cell:
+
+| algorithm | Random | Nearly sorted | Nearly reversed | range | range in a single run (p1..p99) |
+| --- | --- | --- | --- | --- | --- |
+| bubble | 120.0 | 120.0 | 120.0 | **0.0** | 0.0 .. 0.0 |
+| insertion | 72.6 | 25.0 | 115.1 | 90.2 | 86.4 .. 93.6 |
+| merge | 45.7 | 36.9 | 36.9 | **8.8** | 7.6 .. 10.7 |
+| quick | 51.0 | 94.8 | 90.8 | 43.8 | 36.2 .. 53.2 |
+
+Our bubble sort is perfectly flat, so *it* is the most stable of the four, and its
+flatness is the missing early exit — a defect, not a virtue. Merge is the most
+stable of the three that respond to their data at all. This is the trap CLAUDE.md
+names ("a true number can still make a false claim"), so the card gets the narrower
+true sentence. **Proposed: "Barely changes with the starting data: 46, 37, 37."**
+The three numbers are the evidence, they are the row a reader can check against the
+table above, and no superlative is claimed. (Rejected: "most stable across input
+shapes" — false while bubble's row is flat; "the least adaptive" — true but reads
+as criticism of the wrong thing, since being unbothered is merge's selling point.)
+
+**2. Bubble's card cannot say "doesn't adapt to input" unqualified.** That is the
+exact sentence CLAUDE.md was written about: true of *our* fixed-loop bubble sort,
+false of bubble sort, and the false reading is the one a reader reaches. Every
+other place on the page that states a bubble number carries "no early exit" beside
+it. **Proposed: the card carries a variant line under the algorithm name, in the
+same idiom the statistics table already uses for its row headers**
+(`Bubble sort` / `no early exit`), and the finding then reads "Doesn't adapt to its
+input — 120 comparisons every time." Quick's card gets the same line
+(`last-element pivot`); insertion and merge get none, because they are the ordinary
+versions and the table says so.
+
+### The four cards
+
+Structure, top to bottom: **algorithm name** → **variant, if ours is a variant** →
+**the finding** → **`Try: <improvement>`**. The finding is the black text and the
+`Try:` line is the blue one, reversing today's order, which puts the improvement
+label second where it belongs.
+
+| card | finding (proposed) | try |
+| --- | --- | --- |
+| Bubble sort <small>no early exit</small> | Doesn't adapt to its input — 120 comparisons every time. | Try: early exit |
+| Insertion sort | Swings the widest of the four: cheapest on nearly-sorted, near-worst on nearly-reversed. | Try: binary search |
+| Merge sort | Barely changes with the starting data: 46, 37, 37. | Try: skip ordered runs |
+| Quick sort <small>last-element pivot</small> | Pivot choice decides everything — more work on nearly-sorted input than on random. | Try: random pivot |
+
+Each is one sentence, each is checkable against the statistics table directly above
+it, and none of them describes a fix. Clicking a card behaves exactly as it does
+now: it loads the Improvements area, draws a fresh array, and runs the 20-array
+comparison.
+
+### Bars in their final sorted position — a design fork, measured
+
+"Already in its final sorted position" can mean two different things, and the
+measurement says they behave very differently. 400 runs per cell, counting how
+often a bar takes the mark and then **loses** it again:
+
+| | Random | Nearly sorted | Nearly reversed |
+| --- | --- | --- | --- |
+| bubble | 5.2 per run, 100% of runs | 1.0, 33% | 7.0, 100% |
+| insertion | 5.1, 100% | 1.0, 36% | 7.1, 100% |
+| merge | 2.6, 92% | 0.9, 33% | 1.0, 65% |
+| quick | 0.9, 60% | 0.3, 11% | 0.3, 33% |
+
+And on nearly-sorted input **7.3 of 16 bars sit in their final place before a
+single comparison happens** (1.0 on random, 0.5 on nearly-reversed).
+
+**Option A — "in its final place *right now*" (recommended).** A bar is marked when
+its value equals the value the sorted array holds at that index. Algorithm-agnostic,
+works identically in both races, needs no change to any generator, and is checkable
+per frame in a test. Costs, stated plainly: a nearly-sorted race opens with about
+half its bars already marked, and in every random or nearly-reversed run a bar or
+five will take the colour and lose it again. That regression is not a bug — it is
+bubble sort pushing a value back out of place, which is worth seeing — but the
+label has to be honest about it, so the legend entry reads **"in its final place
+(it can still move)"** rather than "sorted".
+
+**Option B — "the algorithm is finished with it".** Mark only what an algorithm has
+provably settled: bubble's growing tail after each pass, quick sort's placed
+pivots. Never regresses, so the colour only ever grows. But insertion sort and
+merge sort settle *nothing* until their last frame — a sorted prefix can still
+receive a smaller value, and a merged run is still going to be merged again — so
+two of the four cards would show no colour at all until the end. It also means
+changing what every generator yields (a new `settled` field on `SortStep`), which
+touches the frame contract Amendment 1 exists to protect.
+
+**Option C — leave it.** The finished panel already goes green all at once.
+
+Recommending **A**, with the honest legend. It is the only one that shows progress
+in all four algorithms, and the flicker is information rather than noise.
+
+**The colour, either way: the green already on the page** (`#16a34a`, what a
+finished panel turns). Then "green = in its final place" is one rule, and the
+whole-panel green at the end is a consequence of it rather than a second rule.
+Precedence, unchanged in spirit: pivot violet beats compared amber beats in-place
+green beats the default blue. The improvement race has no legend today, so it gets
+the same three-swatch line the main race has — the colour is meaningless without
+it, and "consistently in both races" has to include the key.
+
+### The transposed improvement table
+
+Today: one row per shape, columns Original and Improved. Proposed, matching the
+main statistics table exactly — three shape columns, one row per variant:
+
+```
+                        Random    Nearly sorted   Nearly reversed
+Original                 45.3          36.0            36.8
+no early exit
+Improved                 55.6          31.3            50.8
+early exit             0/0/20        14/0/6          0/0/20
+```
+
+What this buys: the highlight now compares **down a column** like the main table's
+does, the two variants are named in the row headers in the same `<small>` idiom the
+main table uses for its algorithms, and the win/tied/lost triple appears once per
+shape under the Improved cell instead of being a per-row afterthought. What it
+costs: the DOM contract inverts, so `data-shape` moves from the rows to the cells
+and headers, rows gain `data-variant="original" | "improved"`, and the per-row
+`data-direction` becomes a per-column fact carried on the Improved cell. Six tests
+from Amendments 6 and 7 read the old shape and get rewritten. The tolerance rule
+and every number are untouched.
+
+Risk to verify in the browser, not by reasoning: at 390px this becomes a
+four-column table like the main one, so the count line has ~80px. Written as
+`14/0/6` (no spaces, matching the main table's `15/20 won`) it should fit; if it
+wraps or clips, the count moves into the caption's territory and I will say so
+rather than shrink the type.
+
+### The four headings, and the section split
+
+| now | proposed |
+| --- | --- |
+| `h1` Sorting race | `h1` Sorting race |
+| — (the race has no heading) | `h2` **Race** |
+| `h2` Side A / `h2` Side B | `h3` Side A / `h3` Side B |
+| `h2` Does the winner hold when the data changes? | `h2` **Statistics** |
+| `h2` What we found *(contains the cards **and** the race)* | `h2` **What we found** *(cards only)* |
+| `h3` *chosen card* — inside the findings section | `h2` **Improvements** → `h3` *chosen card* |
+
+Three consequences worth approving explicitly:
+
+1. **The improvement race becomes its own section**, so `id="improve"` moves onto
+   it and the `#variant-detail` link ("the section below races the repairs") still
+   resolves — checked by an existing test.
+2. **The panel titles drop to `h3`**, which fixes the outline problem I flagged at
+   the end of Amendment 7: "Side A" is currently a sibling of the section headings.
+   It also lets the section headings take a larger size than the panel titles
+   (proposed `h2` 1.35rem against `h3` 1.05rem), which is the type-scale change I
+   said was yours to make. The four story steps then read by weight, not only by
+   position.
+3. **"Does the winner hold when the data changes?" is lost.** That heading was
+   doing explanatory work; "Statistics" does not. The sentence under it — "One race
+   is one array, and a lucky array flatters an algorithm." — already carries the
+   question, so nothing true is lost, but the page gets slightly less pointed. Your
+   call, and this is the cost.
+
+### The remaining copy, cut
+
+| block | now | proposed |
+| --- | --- | --- |
+| findings intro | 35 w | **0** — removed, per the brief |
+| improvements intro | — | 18 w: "The same change can help on one starting shape and cost comparisons on another, so each fix races its own original on the identical arrays." |
+| statistics caption | 68 w | 45 w: "20 arrays of each shape, 16 items each — the identical 20 to all four algorithms. Big number: average comparisons. Small number: how many of the 20 it used the fewest on, ties counting for each, so a column can top 20. Comparisons only: not time, not memory, and not a claim about longer arrays." |
+| `#variant-detail` | 67 w | 38 w: "Two rows say more about our code than about the algorithms: our **bubble sort** has no early exit, so it makes the same 120 comparisons whatever the data, and our **quick sort** takes the last value as its pivot, which is why nearly-ordered data costs it more than random. Both are repaired below." |
+| `improve-finding` line | 7–15 w | **0** — deleted; see below |
+| comparison caption | 39 w | 24 w: "Small number: arrays the improvement won/tied/lost, out of 20. Averages under 2.5 comparisons apart are left unmarked." |
+| four `expect` paragraphs | 77 w | unchanged — Amendment 7 already cut these to the one conclusion the race and table cannot show |
+
+**Deleting the `improve-finding` line** is the one cut not implied by the brief, so
+it is called out: the Improvements area currently repeats the chosen card's finding
+underneath its own heading, and after this amendment the finding is the card's main
+text, sitting selected and highlighted a few centimetres above. Repeating it was
+worth it when the card's main text was the improvement label; it is duplication now.
+Removing it deletes a `data-testid` two tests assert. Say no and it stays.
+
+Every caveat that survives Amendment 7 survives this: identical arrays within a
+column, ties inflating a column, comparisons-only, no extrapolation to longer
+arrays, both variant confessions, the array length, and the ±2.5 tolerance.
+
+Projected on-page total: **~245 words** of prose (from 452 after Amendment 7, 823
+before it), plus the four cards' findings.
+
+### Ambiguities, and how you settled them
+
+1. **The in-place colour: A, B or C above.** → **A**, "in its final place right
+   now", with the honest legend. Accepted knowing a nearly-sorted race opens about
+   half green and that green bars visibly go blue again several times per run.
+2. **"Remove the intro sentence" — remove, or move?** → **Move** one clause. The
+   sentence leaves Findings; the caveat reappears as the 18-word line under
+   Improvements.
+3. **Merge's card wording**, given the measurement above. → **"Barely changes with
+   the starting data: 46, 37, 37."** No superlative.
+4. **Losing "Does the winner hold when the data changes?"** for the plain word
+   "Statistics". → **Not accepted.** The heading still becomes `Statistics` as the
+   brief asks, so the question moves into the sentence directly beneath it: *"Does
+   the winner hold when the data changes? One race is one array, and a lucky array
+   flatters an algorithm."* The heading is concise and the explanatory work is
+   kept — this is a departure from the table above, where that row read
+   "unchanged", and it is the only place this amendment adds a word rather than
+   cutting one. Projected total moves 245 → 251 words.
+5. **Deleting the duplicated finding line** in the Improvements area. → **Yes.**
+   `improve-finding` and its two tests go.
+
+### Machine-checked vs. judgement, this amendment
+
+- **Machine-checked:** every card renders the finding before the `Try:` line, in
+  that DOM order; bubble's and quick's cards carry their variant, and insertion's
+  and merge's do not; a bar marked in-place holds exactly the value the sorted
+  array holds at that index, asserted on every frame of every algorithm and shape,
+  in both races; the final frame marks all sixteen; the transposed table has one
+  row per variant and one column per shape, with `data-fewest` on at most one cell
+  per column and none when the column's two averages are within the tolerance; the
+  win/tied/lost triple still sums to 20 in every column; the four `h2`s are exactly
+  Race, Statistics, What we found, Improvements, in that document order, with the
+  panel titles below them as `h3`; `#improve` still resolves from
+  `#variant-detail`; and every existing number, sample size and generator is
+  unchanged (the whole existing suite must stay green).
+- **Judgement, yours:** whether the cards now read as findings rather than as a
+  menu of fixes; whether a green bar that later moves reads as informative or as a
+  glitch; whether the transposed table is easier to read than the one it replaces
+  or merely more consistent with the one above it; and whether "Race / Statistics /
+  What we found / Improvements" reads as a story or as a filing system.
+- **Explicitly unchanged:** all four algorithms and all four improvements, both
+  input generators, the comparison metric, every sample size, the array length, the
+  two registries, both speed sliders, the shape selector's scope, the ±2.5
+  tolerance, and every number the page reports.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
