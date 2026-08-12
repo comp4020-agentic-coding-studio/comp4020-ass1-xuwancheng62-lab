@@ -307,6 +307,134 @@ Amendment 1), input-shape variations, the dead CSS transition, the two-panel
 structure, and the four frozen decisions. Insertion is a fourth *option*, not
 a third panel.
 
+## Amendment 3 — V1.3: input shape (proposed, awaiting approval)
+
+V1.2 answers "how much work does each algorithm do on this shuffle". The
+question it raises is whether the winner is a property of the *algorithm* or of
+the *data*, and right now the page quietly implies the former, because every
+array it has ever shown the reader is a uniform random shuffle. This adds
+starting shape as a variable of the existing mechanic. Trips the trigger test:
+it changes what the reader can do.
+
+### The premise, measured first
+
+Worth checking before building, because if the ranking held steady across
+shapes there would be nothing to show. It does not hold — **the winner
+changes**, and one algorithm goes from best to worst:
+
+| Algorithm | Random (2000 arrays) | Nearly sorted (2000 arrays) | Reversed (one array, exact) |
+| --- | --- | --- | --- |
+| Bubble | 120.0 — wins 0% | 120.0 — wins 0% | 120 |
+| Insertion | 72.6 — wins 0.3% | **25.1 — wins 99.7%** | 120 |
+| Merge | **45.7 — wins 77%** | 36.9 — wins 0.7% | **32 — wins** |
+| Quick | 50.8 — wins 22% | 94.7 — wins 0% | 120 |
+
+Three readings the current page cannot show, and this one can:
+
+- **Insertion goes from second-worst to a near-certain winner** (72.6 → 25.1)
+  and then to joint-worst on reversed (120). Same algorithm, same metric, three
+  different verdicts. This is the adaptivity story Amendment 2 explicitly
+  deferred for want of an input-shape control.
+- **Quick sort collapses on nearly-sorted data** (50.8 → 94.7), which is
+  counter-intuitive and the most interesting thing on the page.
+- **Merge barely moves** (45.7 → 36.9 → 32). Its cost is nearly independent of
+  the input, which is a genuine property of merge sort and reads clearly
+  against the other three moving around it.
+
+### What changes
+
+One control, in the existing `.controls` row next to the speed slider: a
+`select` labelled **Starting data**, options Random / Nearly sorted / Reversed,
+default Random. No new panel, no new section, no change to the race, the
+algorithms, the comparison metric, the speed control or the highlighting.
+
+It feeds the one place the starting array is made, so it drives **both** the
+single race and the statistics run without any second mechanism: the shape
+select regenerates the shared array immediately (the same path the shuffle
+button uses), and the statistics run generates its arrays from the selected
+shape.
+
+### Defining "nearly sorted" — chosen on evidence
+
+Not obvious, and the definition changes what the reader sees, so four
+candidates were measured over 500 arrays each:
+
+| Definition | Insertion avg | Insertion wins | Avg inversions | Came out fully sorted |
+| --- | --- | --- | --- | --- |
+| 2 adjacent swaps | 16.8 | 500/500 | 1.9 | **32/500** |
+| 2 swaps anywhere | 31.9 | 444/500 | 17.3 | 4/500 |
+| 3 swaps anywhere | 38.2 | 372/500 | 23.8 | 0/500 |
+| **Move 2 values to random slots** | **25.0** | **498/500** | **10.3** | 8/500 |
+
+**Chosen: sorted, then two values pulled out and dropped back in random
+positions**, resampled if the result comes out fully sorted (verified: 0 of
+2000 arrive sorted with the guard). Reasons, in order:
+
+- Adjacent swaps look identical to sorted (average max displacement 1.1) and
+  6% of the time *are* sorted — a "nearly sorted" array that is sorted reads as
+  a bug.
+- Three swaps anywhere drifts toward random: Insertion wins only 74%, so the
+  demonstration stops demonstrating.
+- The chosen one is describable in one sentence to a reader — "sorted, then two
+  values moved" — and is visibly disturbed without being random.
+
+### Reversed is deterministic — two consequences
+
+There is exactly one reversed array of 16 items, which breaks two assumptions
+V1.2 was allowed to make:
+
+1. **The statistics run would be 20 identical runs.** So the run count becomes
+   a property of the shape: 20 for Random and Nearly sorted, **1 for
+   Reversed**, where the numbers are exact rather than sampled. The table's
+   scope line has to say which it is showing, or the reader will read an exact
+   count as an average over varied inputs.
+2. **"New shuffle" becomes a no-op** under Reversed — it regenerates the same
+   array. Proposed: relabel the button **"New start"**, which is true under all
+   three shapes, rather than leaving a button whose label claims something it
+   isn't doing.
+
+Race length at the 100ms default also shifts, worth knowing before it surprises
+anyone: Insertion drops to 2.9s on nearly-sorted, Quick rises to 11.3s there
+and 13.5s on reversed. The slider covers it; nothing to change.
+
+### Two honest-labelling requirements this creates
+
+Both numbers below are correct measurements that would imply a false general
+claim if left unlabelled, and both are things this iteration is explicitly *not*
+allowed to fix — so the fix has to be words on the page.
+
+- **Bubble's flat 120 across all three shapes** is a property of *our*
+  implementation's fixed nested loop, not of bubble sort. Textbook bubble sort
+  with a swapped-flag early exit is one of the *most* adaptive of the four and
+  would take 15 comparisons on sorted input. A reader watching Bubble sit at
+  120 while Insertion drops to 25 would reasonably conclude bubble sort cannot
+  exploit order. That conclusion is wrong, and the nearly-sorted shape is what
+  makes it visible.
+- **Quick's collapse to 94.7 is caused by taking the last element as pivot.**
+  A random or median-of-three pivot does not degrade this way on nearly-sorted
+  input. The honest claim is "this pivot choice", not "quick sort".
+
+So V1.3 adds a short note near the shape control naming both variant choices.
+This is the smallest honest version: one sentence, not a section, and it makes
+the two deferred items (Bubble's early exit, pivot strategies) legible as
+choices rather than looking like results.
+
+### Open decisions for review
+
+1. **Run count for Reversed** — 1 exact run as proposed, or keep 20 identical
+   runs for uniformity (my recommendation is 1; 20 identical runs is a
+   misleading kind of tidy).
+2. **Relabel "New shuffle" → "New start"** — proposed, since the current label
+   is false under two of the three shapes.
+
+### Explicitly unchanged
+
+No Bubble early exit and no alternative pivot strategies, as instructed — both
+now have a visible symptom and a named reason, which is better evidence than
+either would be if quietly fixed. Also unchanged: the four algorithms, the
+comparison metric, the speed control, the two-panel race structure, the
+winner-by-fewest-comparisons rule, the highlighting, and the array length of 16.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
@@ -327,6 +455,18 @@ a third panel.
   highlight colour and differ only in the direction their pair travels; and
   whether the stats table's caption is precise enough that nobody leaves
   thinking it measured runtime.
+- **Machine-checked, added by Amendment 3:** the permutation and highlight tests
+  become parameterised by shape, so every algorithm is checked against every
+  starting shape rather than only against random shuffles — verified in advance
+  as 0 bad frames in 211133 frames across nearly-sorted, reversed and sorted
+  inputs, so this is standing backpressure for later changes rather than a fix
+  for a known bug. Plus: each shape generator returns a permutation of 1..16,
+  nearly-sorted is never fully sorted and never fully random, reversed is exactly
+  descending, and the selected shape reaches both the race and the stats run.
+- **Judgement only, added by Amendment 3:** whether a reader actually reaches
+  "the winner depends on the data" rather than "merge sort is best", which is
+  what one badly-worded sentence would cost; and whether the variant-choice note
+  reads as useful honesty or as an excuse.
 - **Machine-checked, next step:** the core-interaction contract from "Design
   decisions forced by the spec" — triggering Race ends both panels'
   bar-height sequences in non-decreasing order, with each panel's comparison
