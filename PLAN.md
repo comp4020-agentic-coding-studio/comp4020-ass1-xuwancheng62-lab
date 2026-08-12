@@ -1823,6 +1823,68 @@ populated the table and so was reporting its `:hover` colour mid-transition. Bot
 were the check being wrong, not the page. It now parks the pointer, waits past the
 120ms transition, and exempts the selected state.
 
+## Amendment 10b — the icon in front of the title (13 August 2026)
+
+You put a PNG in the repo root and asked for it in front of the header. Recorded
+here rather than folded into Amendment 10, which is frozen.
+
+### What I did with the file
+
+The file you dropped in was `07eadc00-b8d3-495b-8a29-e42854822577.png`:
+**1254×1254, 1,135,286 bytes**, no transparency. I read those off the file with
+`sips`, not from the name. Two problems with using it as it stood — a megabyte is
+a lot to send someone for a 48px picture, and at 48px the artwork was swimming
+inside its own white margin — so the tracked asset is a derived copy:
+
+- cropped to the middle **1140×1140** (about 91%), which trims most of the white
+  ring around the rounded square while leaving its corners intact;
+- resized to **160×160**, and saved as `icon.png` — **24,800 bytes**, 2.2% of the
+  original.
+
+160px is deliberately more than it displays at. A phone packs two or three device
+pixels into each CSS pixel, so an image authored at exactly 48px looks soft there.
+
+**Your original file is untouched and still untracked in the repo root.** I did
+not delete it; it is yours to keep or bin. It is not in the commit and will not
+ship.
+
+### Where it sits, and why there
+
+Inside the `<h1>`, before the text — not as a sibling above it. Amendment 9's test
+requires the `<h1>` to be the first element in `<main>` ("the title is the top of
+the page"), and an element above it would turn that red. Putting the image inside
+the title satisfies "in front of the header" and keeps the test honest rather than
+edited to suit.
+
+It is sized in `em`: `height: 1.15em`, meaning 1.15× whatever the title's current
+font size is. The title is already a `clamp()` that grows with the window, so one
+line keeps the icon in proportion at every width with no second number to maintain.
+
+`alt=""` is the accessibility decision, and it is the deliberate one: an empty alt
+tells a screen reader to skip the image, which is right because the words beside it
+already say *Sorting race*. `alt="Sorting race"` would announce the title twice.
+`spec/invariants.test.ts` only checks that *some* alt attribute exists, so the new
+test asserts it is empty and that the image is inside the `<h1>`, before the text.
+
+### Measured in Chrome
+
+| Viewport | Icon | Title | Title lines |
+|---|---|---|---|
+| 1920 | 48×48 | 41.6px | 1 |
+| **390** | **37×37** | 32px | 1 |
+| 320 | 37×37 | 32px | 1 |
+
+The image loads (checked `naturalWidth > 0` and watched for any 4xx response — a
+404 renders as a gap that a screenshot makes look like a design choice), stays
+square, and sits inside the title's box. Amendment 9's and 10's suites were re-run
+unchanged and stayed green: 520 animation frames all permutations, nothing escaping
+its card, every control edge still on the 3:1 token.
+
+### Not done, because you did not ask
+
+The page still has no favicon — the icon in the browser tab. Same file would do it
+in one line. Say the word.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants

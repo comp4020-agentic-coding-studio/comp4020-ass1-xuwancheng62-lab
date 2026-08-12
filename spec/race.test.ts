@@ -1933,6 +1933,32 @@ describe("the shipped index.html", () => {
     ).toBeGreaterThan(0);
   });
 
+  // Amendment 10b. The icon lives inside the <h1>, in front of its text. That
+  // arrangement is load-bearing in two ways a later edit could quietly undo:
+  // moved out of the <h1> it would break the test above, which requires the
+  // title to be the first thing in <main>; and given real alt text it would
+  // make a screen reader announce "Sorting race" twice, once for the picture
+  // and once for the words beside it. The empty alt is the decision, so it is
+  // the thing asserted -- invariants.test.ts only checks that SOME alt exists.
+  it("puts the icon inside the title, marked as decorative", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    const h1 = document.querySelector("main h1")!;
+    const mark = h1.querySelector("img.mark");
+    expect(mark, "the masthead icon is not inside the <h1>").toBeTruthy();
+    expect(
+      mark!.getAttribute("alt"),
+      "the masthead icon needs alt=\"\": the title text already names the page",
+    ).toBe("");
+
+    // In front of the words, not after them.
+    expect(
+      mark!.compareDocumentPosition(h1.lastChild!) & 4,
+      "the icon sits after the title text",
+    ).toBeGreaterThan(0);
+  });
+
   // Both re-roll buttons say the same thing, because they do the same thing.
   it('calls both re-roll buttons "New array"', () => {
     const dom = new JSDOM(html);

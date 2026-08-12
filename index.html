@@ -8,7 +8,22 @@
   </head>
   <body>
     <main>
-      <h1>Sorting race</h1>
+      <!--
+        The icon sits INSIDE the <h1>, before its text, rather than as a
+        separate element above it. Two reasons: my own spec test requires the
+        <h1> to be the first thing in <main> (Amendment 9's "the title is the
+        top of the page"), and an image that is part of the title should be
+        part of the title in the markup too.
+
+        alt="" is deliberate, not forgotten. An empty alt tells a screen reader
+        "this picture adds nothing you are missing" and skips it -- which is
+        right here, because the words next to it already say "Sorting race".
+        Giving it alt="Sorting race" would make the title read out twice.
+      -->
+      <h1>
+        <img class="mark" src="./icon.png" alt="" width="160" height="160" />
+        Sorting race
+      </h1>
       <!--
         Amendment 9: the Home link is gone -- it was a one-page site's only
         navigation pointing at the page you were already on. The <nav> itself

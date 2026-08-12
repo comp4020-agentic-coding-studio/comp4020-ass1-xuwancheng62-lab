@@ -109,10 +109,33 @@ a {
    2.6rem ceiling on a 1920px desktop. One declaration instead of a size plus a
    breakpoint, and it never overflows because the min and max are absolute. */
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0;
   font-size: clamp(2rem, 1.35rem + 2.2vw, 2.6rem);
   letter-spacing: -0.025em;
   line-height: 1.1;
+}
+
+/* The icon in front of the title. Sized in `em`, which means "relative to the
+   font size of the text I sit next to" -- so it is 1.15 times the title's size,
+   whatever that size currently is. The title itself is a clamp() that grows
+   with the window, so this one line keeps the icon in proportion at every
+   width: about 37px on a 390px phone, about 48px on a 1920px desktop, with no
+   second measurement to keep in step.
+
+   `width: auto` with the height fixed keeps it square rather than stretching,
+   and `flex-shrink: 0` stops the flex row from squeezing it thinner than that
+   if the title ever has to fight for space.
+
+   The file is 160px square, which is more pixels than either of those display
+   sizes needs -- that is on purpose, because a phone screen packs two or three
+   device pixels into each CSS pixel and a 48px image would look soft on one. */
+h1 .mark {
+  flex-shrink: 0;
+  height: 1.15em;
+  width: auto;
 }
 
 /* Section headings. -0.01em tracking at this size stops a system-ui heading
