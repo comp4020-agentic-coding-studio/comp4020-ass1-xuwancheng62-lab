@@ -38,6 +38,32 @@ describe("each sort algorithm", () => {
         expect(result.value.array[i]).toBeGreaterThanOrEqual(result.value.array[i - 1]);
       }
     });
+
+    // PLAN.md Amendment 1: the intermediate frames ARE the explanation, so a
+    // frame the data could never be in is a wrong answer even when the final
+    // array is sorted. Merge Sort used to write merged values into the live
+    // array while its source copies still held the originals, so mid-merge
+    // frames showed the same bar height twice.
+    it(`${key}: every intermediate frame is a permutation of the input`, () => {
+      const input = shuffledRange(16);
+      const expected = [...input].sort((a, b) => a - b);
+      const generator = algorithm(input);
+
+      let frame = 0;
+      let result = generator.next();
+      while (true) {
+        const actual = [...result.value.array].sort((a, b) => a - b);
+        expect(
+          actual,
+          `${key} frame ${frame} is not a permutation of the input: [${result.value.array.join(", ")}]`,
+        ).toEqual(expected);
+        if (result.done) break;
+        frame++;
+        result = generator.next();
+      }
+
+      expect(frame, `${key} yielded no intermediate frames`).toBeGreaterThan(0);
+    });
   }
 });
 
