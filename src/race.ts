@@ -7,6 +7,7 @@ import {
   SHAPE_DESCRIPTIONS,
   SHAPE_LABELS,
   SORT_ALGORITHMS,
+  averageDirection,
   comparisonStats,
   improvementComparison,
   shapeSample,
@@ -404,7 +405,7 @@ export function initRace(root: ParentNode): void {
     improveStatsScope.textContent = `${ALGORITHM_LABELS[algorithm]}, ${variant} vs ${improvement.label}: ${STATS_RUNS} arrays of each shape, the same ${STATS_RUNS} to both.`;
 
     const headerRow = document.createElement("tr");
-    for (const label of ["Starting data", "Original", "Improved", "Won / tied / lost"]) {
+    for (const label of ["Starting data", "Original", "Improved"]) {
       const th = document.createElement("th");
       th.scope = "col";
       th.textContent = label;
@@ -422,27 +423,44 @@ export function initRace(root: ParentNode): void {
         name.textContent = SHAPE_LABELS[shape];
         tr.append(name);
 
-        const original = result.originalAverage.toFixed(1);
-        const improved = result.improvedAverage.toFixed(1);
-        // Classified on the two numbers as displayed, so the tint can never
-        // disagree with what the row shows: rounding to the same tenth is what
-        // "does nothing here" looks like at this sample size. Read by an
-        // attribute selector in styles.css to tint the row; the numbers carry the
-        // meaning on their own, so the colour is reinforcement, not the message.
-        tr.dataset.direction =
-          original === improved
-            ? "same"
-            : result.improvedAverage < result.originalAverage
-              ? "better"
-              : "worse";
+        // Which of the two averages is marked, or neither, with a measured
+        // tolerance so a difference the size of this sample's own noise reads as
+        // no difference (PLAN.md Amendment 7). Rounded to the one decimal the
+        // cells print *before* the comparison, so a reader subtracting the two
+        // numbers in the row gets the same answer the code did -- which is what
+        // the caption's "under 2.5 comparisons apart" promises.
+        const printed = [result.originalAverage, result.improvedAverage].map((average) =>
+          Number(average.toFixed(1)),
+        );
+        const direction = averageDirection(printed[0], printed[1]);
+        tr.dataset.direction = direction;
 
-        for (const text of [
-          original,
-          improved,
-          `${result.improvedWins} / ${result.ties} / ${result.improvedLosses}`,
-        ]) {
+        // Same cell anatomy as the statistics matrix above -- big average, small
+        // count of arrays underneath, and the blue data-fewest highlight on the
+        // fewer of the two. Reusing the matrix's markup and CSS rather than a
+        // second table style is the point: the finding is the highlight moving
+        // between the Original and Improved columns as you read down the shapes,
+        // which is exactly how that table is already read.
+        const cells: [number, string | null][] = [
+          [printed[0], null],
+          [printed[1], `${result.improvedWins} / ${result.ties} / ${result.improvedLosses}`],
+        ];
+        for (const [index, [average, record]] of cells.entries()) {
           const cell = document.createElement("td");
-          cell.textContent = text;
+          const value = document.createElement("span");
+          value.className = "avg";
+          value.textContent = average.toFixed(1);
+          cell.append(value);
+          // Just the three counts, as short as the matrix's "7 fewest" above it.
+          // What they are is in the caption, once, rather than repeated in every
+          // row of every card.
+          if (record !== null) {
+            const note = document.createElement("small");
+            note.textContent = record;
+            cell.append(note);
+          }
+          const marked = direction === (index === 0 ? "worse" : "better");
+          if (marked) cell.dataset.fewest = "true";
           tr.append(cell);
         }
         return tr;

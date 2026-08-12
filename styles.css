@@ -256,8 +256,11 @@ a {
   padding: 0.4rem 0.5rem;
 }
 
-/* Three equal shape columns, so a column is read as one condition rather than
-   sized by how long its heading happens to be. */
+/* Equal number columns, so a column is read as one condition rather than sized by
+   how long its heading happens to be. Both tables use this class, so the
+   statistics matrix (three shape columns) and the improvement comparison (two
+   variant columns) share one type scale, one cell anatomy and one highlight
+   (PLAN.md Amendment 7). */
 .matrix thead th:not(:first-child),
 .matrix tbody td {
   width: 22%;
@@ -279,8 +282,10 @@ a {
   white-space: nowrap;
 }
 
-/* Highlighted per column, not per table: this marks "fewest under this
-   condition", and the highlight moving between columns IS the finding. */
+/* Highlighted per row or per column, never per table: this marks "fewest here",
+   and the highlight moving between columns IS the finding -- which algorithm is
+   cheapest under this condition in the statistics matrix, and whether the
+   improvement or the original is cheaper on this shape in the comparison. */
 .matrix tbody td[data-fewest="true"] {
   background: #eef3ff;
 }
@@ -425,36 +430,6 @@ a {
 .improve-shape {
   font-size: 0.8rem;
   color: #555;
-}
-
-.improve-matrix {
-  font-size: 0.9rem;
-}
-
-/* Three equal number columns, the shape name taking what's left -- the same
-   division the statistics matrix uses, so the two tables scan alike. */
-.improve-matrix thead th:not(:first-child),
-.improve-matrix tbody td {
-  width: 22%;
-}
-
-/* "19 / 1 / 0" on one line: broken across two it stops reading as one triple. */
-.improve-matrix tbody td:last-child {
-  white-space: nowrap;
-}
-
-/* Tints the row by what its own two averages say -- green where the improvement
-   helped, red where it cost comparisons, plain where both round to the same
-   number. An attribute selector: race.ts sets data-direction on the row from the
-   numbers it just printed, so the tint cannot disagree with the row. The counts
-   in the row carry the finding on their own; this only makes the pattern across
-   the three shapes visible without reading them. */
-.improve-matrix tbody tr[data-direction="better"] {
-  background: #f0fdf4;
-}
-
-.improve-matrix tbody tr[data-direction="worse"] {
-  background: #fef2f2;
 }
 
 .improve-expect {

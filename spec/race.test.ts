@@ -6,10 +6,12 @@ import { vi } from "vitest";
 import { initRace } from "../src/race";
 import {
   ALGORITHM_VARIANTS,
+  AVERAGE_TOLERANCE,
   IMPROVED_ALGORITHMS,
   IMPROVEMENTS,
   INPUT_SHAPES,
   SORT_ALGORITHMS,
+  averageDirection,
   comparisonStats,
   countComparisons,
   countVariantComparisons,
@@ -901,6 +903,88 @@ describe("the 20-run comparison", () => {
   });
 });
 
+/*
+ * The tolerance on the comparison's highlight (PLAN.md Amendment 7). Twenty
+ * arrays is a small sample, so a cell whose two averages differ by a couple of
+ * comparisons is showing this sample's noise, not a difference; marking one
+ * column there tells the reader something untrue.
+ *
+ * The band itself is tested on constructed numbers rather than on samples, so
+ * these cannot flake: the rule is arithmetic, and the sampling question is a
+ * separate one asked below.
+ */
+describe("the tolerance on the average highlight", () => {
+  const RUNS = 20;
+
+  it("leaves a difference inside the band unmarked, in either direction", () => {
+    const inside = AVERAGE_TOLERANCE - 0.1;
+    expect(averageDirection(50, 50)).toBe("same");
+    expect(averageDirection(50, 50 - inside)).toBe("same");
+    expect(averageDirection(50, 50 + inside)).toBe("same");
+  });
+
+  it("marks a difference at or beyond the band, naming the cheaper side", () => {
+    // At exactly the tolerance it is a difference: the caption says averages
+    // *under* 2.5 apart are left unmarked, so 2.5 has to be marked or the page
+    // and the code disagree by one edge case.
+    expect(averageDirection(50, 50 - AVERAGE_TOLERANCE)).toBe("better");
+    expect(averageDirection(50, 50 + AVERAGE_TOLERANCE)).toBe("worse");
+    expect(averageDirection(120, 24.8)).toBe("better");
+    expect(averageDirection(24.8, 120)).toBe("worse");
+  });
+
+  /*
+   * What the band does to the real cells, measured before being asserted: the
+   * closest approach of |improvedAverage - originalAverage| over 3,000 samples of
+   * 20 arrays each was
+   *   bubble/nearlyReversed     0.0 .. 0.3     always inside the band
+   *   bubble/random             1.7 .. 13.5
+   *   merge/nearlySorted        1.8 ..  8.2
+   *   quick/random              0.0 .. 11.2
+   *   the other eight cells     7.8 .. 73.6    never inside the band
+   *
+   * So only nine of the twelve cells can be asserted. Three are deliberately
+   * left out, and the reason differs:
+   *   quick/random     the improvement genuinely changes nothing on average, and
+   *                    at 20 arrays the noise is wider than the band -- about one
+   *                    draw in four is still marked. That is the honest state of
+   *                    the measurement, so no test claims otherwise.
+   *   merge/nearlySorted, bubble/random
+   *                    real savings (4.8 and 6.5) that this sample size can shrink
+   *                    to under 2.5. Asserting them would be a flake, and
+   *                    widening the band to cover them would erase merge's whole
+   *                    finding in over half of all draws.
+   * Amendment 7 said "the nine large cells" here; the measurement above says the
+   * ninth is bubble/random, whose margin is thin, so this asserts eight plus the
+   * always-neutral one. Recorded rather than quietly adjusted.
+   */
+  const cells: { key: AlgorithmKey; shape: ShapeKey; expected: "better" | "same" | "worse" }[] = [
+    { key: "bubble", shape: "nearlySorted", expected: "better" },
+    { key: "bubble", shape: "nearlyReversed", expected: "same" },
+    { key: "insertion", shape: "random", expected: "better" },
+    { key: "insertion", shape: "nearlySorted", expected: "worse" },
+    { key: "insertion", shape: "nearlyReversed", expected: "better" },
+    { key: "merge", shape: "random", expected: "worse" },
+    { key: "merge", shape: "nearlyReversed", expected: "worse" },
+    { key: "quick", shape: "nearlySorted", expected: "better" },
+    { key: "quick", shape: "nearlyReversed", expected: "better" },
+  ];
+
+  for (const { key, shape, expected } of cells) {
+    it(`reads ${key} on ${shape} input as ${expected}, over ${RUNS} arrays`, () => {
+      const result = improvementComparison(key, shapeSample(shape, 16, RUNS));
+      const direction = averageDirection(
+        Number(result.originalAverage.toFixed(1)),
+        Number(result.improvedAverage.toFixed(1)),
+      );
+      expect(
+        direction,
+        `${key}/${shape}: original ${result.originalAverage.toFixed(1)}, improved ${result.improvedAverage.toFixed(1)}`,
+      ).toBe(expected);
+    });
+  }
+});
+
 describe("the improvement race", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -1115,12 +1199,18 @@ describe("the improvement race", () => {
    */
 
   // Reads the rendered table back as data, so these assert what a reader sees
-  // rather than what the module returned.
+  // rather than what the module returned. Two number cells per row, each a big
+  // average with an optional small line under it -- the statistics matrix's cell
+  // anatomy, adopted wholesale in Amendment 7.
   const readTable = (document: Document) =>
     [...document.querySelectorAll('[data-testid="improve-stats-body"] tr')].map((row) => ({
       shape: (row as HTMLElement).dataset.shape,
       direction: (row as HTMLElement).dataset.direction,
-      cells: [...row.querySelectorAll("td")].map((cell) => cell.textContent!),
+      cells: [...row.querySelectorAll("td")].map((cell) => ({
+        average: cell.querySelector(".avg")!.textContent!,
+        note: cell.querySelector("small")?.textContent ?? null,
+        marked: (cell as HTMLElement).dataset.fewest === "true",
+      })),
     }));
 
   it("shows all three shapes as soon as a card is chosen, with no press", () => {
@@ -1132,23 +1222,48 @@ describe("the improvement race", () => {
     expect(rows.map((row) => row.shape), "not one row per shape, in shape order").toEqual(SHAPE_KEYS);
 
     for (const row of rows) {
-      const [original, improved, record] = row.cells;
-      expect(Number(original), `${row.shape}: original average is not a number`).toBeGreaterThan(0);
-      expect(Number(improved), `${row.shape}: improved average is not a number`).toBeGreaterThan(0);
+      const [original, improved] = row.cells;
+      expect(row.cells.length, `${row.shape}: not two number cells`).toBe(2);
+      expect(Number(original.average), `${row.shape}: original average is not a number`).toBeGreaterThan(0);
+      expect(Number(improved.average), `${row.shape}: improved average is not a number`).toBeGreaterThan(0);
+      expect(original.note, `${row.shape}: the original column grew a count of its own`).toBeNull();
 
-      // "won / tied / lost", and the three have to account for all 20 arrays --
-      // the correction that made ties their own number rather than small print.
-      const parts = record.split("/").map((part) => Number(part.trim()));
-      expect(parts.length, `${row.shape}: "${record}" is not three counts`).toBe(3);
-      expect(parts.reduce((a, b) => a + b, 0), `${row.shape}: "${record}" does not add to 20`).toBe(20);
+      // Won / tied / lost, all three, accounting for all 20 arrays. Moved under
+      // the improved average in Amendment 7, still three numbers.
+      const parts = improved.note!.split("/").map((part) => Number(part.trim()));
+      expect(parts.length, `${row.shape}: "${improved.note}" is not three counts`).toBe(3);
+      expect(parts.reduce((a, b) => a + b, 0), `${row.shape}: "${improved.note}" does not add to 20`).toBe(20);
 
-      // The tint is derived from the two numbers printed in the row, so it can
-      // never disagree with them.
-      const expected =
-        original === improved ? "same" : Number(improved) < Number(original) ? "better" : "worse";
-      expect(row.direction, `${row.shape}: tint says ${row.direction} for ${original} vs ${improved}`).toBe(
-        expected,
-      );
+      // The highlight is derived from the same two averages the row prints, via
+      // the same tolerance the module exports, so it cannot disagree with them.
+      const expected = averageDirection(Number(original.average), Number(improved.average));
+      expect(
+        row.direction,
+        `${row.shape}: marked ${row.direction} for ${original.average} vs ${improved.average}`,
+      ).toBe(expected);
+      expect(original.marked, `${row.shape}: wrong cell highlighted`).toBe(expected === "worse");
+      expect(improved.marked, `${row.shape}: wrong cell highlighted`).toBe(expected === "better");
+    }
+  });
+
+  it("marks neither average when they are within the measured noise band", () => {
+    const { document, click } = setup();
+    click("finding-card-quick");
+
+    for (const row of readTable(document)) {
+      const [original, improved] = row.cells;
+      const gap = Math.abs(Number(improved.average) - Number(original.average));
+      if (gap < AVERAGE_TOLERANCE) {
+        expect(
+          [original.marked, improved.marked],
+          `${row.shape}: ${gap.toFixed(1)} apart and still marked`,
+        ).toEqual([false, false]);
+      } else {
+        expect(
+          original.marked || improved.marked,
+          `${row.shape}: ${gap.toFixed(1)} apart and marked nothing`,
+        ).toBe(true);
+      }
     }
   });
 
@@ -1186,7 +1301,7 @@ describe("the improvement race", () => {
       const rows = readTable(document);
       expect(rows.map((row) => row.shape), `press ${press}: the table changed shape`).toEqual(SHAPE_KEYS);
       for (const row of rows) {
-        const parts = row.cells[2].split("/").map((part) => Number(part.trim()));
+        const parts = row.cells[1].note!.split("/").map((part) => Number(part.trim()));
         expect(parts.reduce((a, b) => a + b, 0), `press ${press}: ${row.shape} lost an array`).toBe(20);
       }
     }

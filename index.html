@@ -16,10 +16,8 @@
       <h1>Sorting race</h1>
       <p>
         Bubble, insertion, merge and quick sort all solve the same problem: put
-        these bars in order, shortest to tallest. Pick one for each side, press
-        <strong>Race</strong>, and watch how differently they get there — same
-        bars, same starting array, wildly different amounts of work. Then change
-        the starting data, and watch the winner change with it.
+        these bars in order. Pick two, press <strong>Race</strong>, and count the
+        work. Then change the starting data.
       </p>
 
       <div class="controls">
@@ -83,13 +81,7 @@
 
       <section class="stats">
         <h2>Does the winner hold when the data changes?</h2>
-        <p>
-          One race is one array, and a lucky array can flatter an algorithm. This
-          runs all four algorithms over 20 arrays of <em>each</em> starting
-          shape, side by side. Read down a column for the ranking under that
-          condition; read across a row for how one algorithm responds to the
-          data it is given.
-        </p>
+        <p>One race is one array, and a lucky array flatters an algorithm.</p>
         <button type="button" data-testid="stats-button">
           Run 20 arrays of each shape
         </button>
@@ -98,44 +90,32 @@
             <span data-testid="stats-scope"
               >Press the button to measure all three.</span
             >
-            The big number is the average comparisons; underneath it is how many
-            of that column's 20 arrays the algorithm used the fewest comparisons
-            on. Within a column all four run on
-            the identical 20 arrays; between columns the arrays differ, which is
-            what a starting shape is. Counts comparisons only — not wall-clock
-            speed or memory, and nothing here says anything about larger arrays.
-            A run counts for every algorithm tied for fewest, so a column's wins
-            can add up to more than 20.
+            Big number: average comparisons over that column's 20 arrays. Small
+            number: how many of those 20 it used the fewest on — ties count for
+            each, so a column can total more than 20. All four algorithms get the
+            identical 20 arrays within a column. Comparisons only: not time, not
+            memory, and not a claim about longer arrays.
           </caption>
           <thead data-testid="stats-head"></thead>
           <tbody data-testid="stats-body"></tbody>
         </table>
         <p class="variants" id="variant-detail">
-          Two of those columns say more about our code than about the
-          algorithms. <strong>Bubble sort</strong> here is the basic fixed-loop
-          version with no early exit, so it makes the same 120 comparisons in
-          all three columns. Adding that early exit cuts its nearly-sorted
-          average by nearly half — but it still lands third of the four there,
-          ahead of only our own quick sort, so the flat 120 is our fault and the
-          low ranking mostly isn't. <strong>Quick sort</strong> here always takes
-          the last value as its pivot, which is why it does <em>more</em> work on
-          nearly-ordered data than on random. Insertion and merge sort are the
-          ordinary versions, so their columns are about the algorithms. Both
-          choices can be repaired, and
-          <a href="#improve">the section below races the repairs</a> rather than
-          asking you to take our word for it.
+          Two columns say more about our code than about the algorithms.
+          <strong>Bubble sort</strong> here has no early exit, so it makes the
+          same 120 comparisons whatever the data. <strong>Quick sort</strong>
+          takes the last value as its pivot, which is why it does <em>more</em>
+          work on nearly-ordered data than on random. Insertion and merge are the
+          ordinary versions. Both can be repaired —
+          <a href="#improve">the section below races the repairs</a>.
         </p>
       </section>
 
       <section class="findings" id="improve">
-        <h2>What we found — does the improvement help?</h2>
+        <h2>What we found</h2>
         <p>
-          Two of those four numbers are our fault, not the algorithm's. So we
-          fixed all four and raced each fix against the original on the same
-          array. Two of the four fixes average <em>worse</em> than the original
-          on some starting shapes — not just on an unlucky array — which is the
-          more interesting result: an improvement is only an improvement for
-          particular data.
+          We fixed all four and raced each fix against its own original on the
+          same arrays. Two of the four average <em>worse</em> on some starting
+          shapes: an improvement is only an improvement for particular data.
         </p>
         <ol class="cards" data-testid="finding-cards"></ol>
 
@@ -144,8 +124,7 @@
             <span data-testid="improve-title">Pick a finding above</span>
           </h3>
           <p class="improve-finding" data-testid="improve-finding">
-            Each card loads its algorithm here, original against improved, both
-            starting from the identical array.
+            Original against improved, from the identical array.
           </p>
           <p class="improve-change" data-testid="improve-change"></p>
           <div class="controls">
@@ -193,10 +172,11 @@
           <button type="button" class="rerun" data-testid="improve-rerun" disabled>
             Run 20 more arrays
           </button>
-          <table class="improve-matrix" data-testid="improve-stats">
+          <table class="matrix" data-testid="improve-stats">
             <caption>
               <span data-testid="improve-stats-scope"></span>
-              Won / tied / lost counts arrays, not comparisons.
+              Small number: arrays the improvement won / tied / lost, out of 20.
+              Averages under 2.5 comparisons apart are left unmarked.
             </caption>
             <thead data-testid="improve-stats-head"></thead>
             <tbody data-testid="improve-stats-body"></tbody>

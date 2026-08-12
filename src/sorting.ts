@@ -356,10 +356,12 @@ export interface Improvement {
   /** What the improved code does differently. */
   change: string;
   /**
-   * What to expect, in words rather than numbers. A function of array length
-   * because merge's honest answer needs the comparison floor for that length --
-   * and every number a reader sees is computed in their browser, never typed
-   * into the source where it could drift from what the code does.
+   * The one conclusion the race and the table cannot show for themselves -- a
+   * guarantee, a trade, or a limit -- in a sentence (PLAN.md Amendment 7).
+   * Anything the numbers below it already say has been cut. A function of array
+   * length because merge's honest answer needs the comparison floor for that
+   * length, and every number a reader sees is computed in their browser, never
+   * typed into the source where it could drift from what the code does.
    */
   expect: (length: number) => string;
 }
@@ -373,36 +375,32 @@ export interface Improvement {
 export const IMPROVEMENTS: Record<AlgorithmKey, Improvement> = {
   bubble: {
     label: "early exit",
-    finding:
-      "The only algorithm that never responds to its data — the same average in all three columns, because our version always runs every pass.",
+    finding: "Never responds to its data — the same average in all three columns.",
     change: "Stop as soon as a pass makes no swaps, which proves the array is already in order.",
     expect: () =>
-      "A large saving on nearly-sorted input, and none at all on nearly-reversed input: a value that has to travel left moves only one place per pass, so those arrays still need almost every pass. It can never cost more than the original.",
+      "Never costs more than the original, but a value still moves only one place per pass, so nearly-reversed input saves nothing.",
   },
   insertion: {
     label: "binary search",
-    finding:
-      "Best of the four on nearly-sorted input and nearly the worst on nearly-reversed — the widest swing on the page, because it walks each value down one place at a time.",
+    finding: "The widest swing on the page: best on nearly-sorted, nearly the worst on nearly-reversed.",
     change: "Binary-search the sorted part for the right position instead of walking down to it.",
     expect: () =>
-      "Much better on random and nearly-reversed input, and clearly worse on nearly-sorted input. It gives up the early break that made it the nearly-sorted champion, and gets a near-constant cost on any input in exchange. That trade is the finding.",
+      "Trades the early break that won nearly-sorted input for a near-constant cost on any input.",
   },
   merge: {
     label: "skip ordered runs",
-    finding:
-      "The steadiest of the four, and the least adaptive: it barely notices the difference between random and nearly-sorted input, where insertion sort's average multiplies several times over.",
+    finding: "The steadiest and least adaptive: barely notices random from nearly-sorted.",
     change:
       "Before merging two sorted runs, spend one comparison asking whether they are already in order end to end, and skip the merge when they are.",
     expect: (length) =>
-      `Better on nearly-sorted input, worse on the other two — the question is asked at every merge and most of the time the answer is no. There is also very little room: no comparison sort can beat ${comparisonFloor(length)} comparisons for ${length} items, and merge sort is already close to that.`,
+      `Little room to win: no comparison sort can beat ${comparisonFloor(length)} comparisons for ${length} items, and merge sort is already close.`,
   },
   quick: {
     label: "random pivot",
-    finding:
-      "Worse on nearly-sorted input than on random input, which is backwards. Taking the last value as the pivot means an ordered array splits off one element at a time.",
+    finding: "Worse on nearly-sorted input than on random, which is backwards.",
     change: "Pick the pivot at random, so the position of a value in the input no longer decides it.",
     expect: () =>
-      "Much better on both nearly-ordered shapes and unchanged on random, at no cost in comparisons. It improves the expected behaviour, not the worst case: a random pivot can still split badly, so races on the same array will not all cost the same. What changes is that no starting shape can force the bad case any more.",
+      "Improves the expected case, not the worst: a random pivot can still split badly, but no starting shape can force it.",
   },
 };
 
@@ -483,6 +481,32 @@ export function comparisonStats(inputs: number[][]): AlgorithmStats[] {
     averageComparisons: inputs.length === 0 ? 0 : totals.get(algorithm)! / inputs.length,
     fewestWins: wins.get(algorithm)!,
   }));
+}
+
+/**
+ * How far apart two 20-array averages have to be before the page marks one of
+ * them as fewer (PLAN.md Amendment 7). Measured, not guessed: over 4,000 samples
+ * of 20 arrays, quick sort's random pivot -- which genuinely costs nothing on
+ * random input, mean difference -0.04 -- still spread from -5.2 to +5.3, while
+ * ten of the twelve algorithm/shape cells sit 8 to 67 comparisons from zero.
+ * 2.5 leaves 73% of those noise draws unmarked and is nowhere near the ten real
+ * effects. It cannot separate noise from merge sort's genuine 4.8-comparison
+ * saving on nearly-sorted input, and it is deliberately too narrow to try: a
+ * band wide enough for that would erase a real finding in most draws.
+ */
+export const AVERAGE_TOLERANCE = 2.5;
+
+/**
+ * Which of two averages to mark, or neither. Pure and exported so the tolerance
+ * is asserted on constructed numbers rather than on a sample that could make the
+ * test flake.
+ */
+export function averageDirection(
+  originalAverage: number,
+  improvedAverage: number,
+): "better" | "same" | "worse" {
+  if (Math.abs(improvedAverage - originalAverage) < AVERAGE_TOLERANCE) return "same";
+  return improvedAverage < originalAverage ? "better" : "worse";
 }
 
 export interface ImprovementComparison {
