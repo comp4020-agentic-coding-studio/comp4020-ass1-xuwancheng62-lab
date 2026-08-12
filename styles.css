@@ -356,9 +356,21 @@ main h2 {
    link buried inside it. Targeted by class rather than by element: as a bare
    `.cards button` this would be lower-specificity than the `.controls button`
    rules above it, which is stylelint's no-descending-specificity error -- the
-   later rule would be the one that loses. */
+   later rule would be the one that loses.
+
+   A column flexbox rather than `display: block`, for one specific reason a
+   screenshot shows better than the CSS does: a <button> centres its contents
+   vertically by default, and the grid stretches all four cards to the tallest
+   one. So with `display: block` the four headings rendered 20px apart -- Quick
+   sort's longer finding pushed its heading up, Bubble's shorter one pushed its
+   heading down -- and a row of four parallel findings didn't read as a row.
+   `flex-start` pins the headings to a shared top; `margin-top: auto` on the
+   label below then pushes every "Try:" line to a shared bottom. */
 .cards .card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
   height: 100%;
   text-align: left;
@@ -397,9 +409,14 @@ main h2 {
   color: #333;
 }
 
+/* `auto` top margin: takes whatever vertical space is left in the card, so the
+   proposal sits at the bottom edge and the four line up across the row. On a
+   phone each card is only as tall as its own content, so there is no space to
+   take and this behaves exactly like the 0.4rem it replaces. */
 .cards .card .card-label {
   display: block;
-  margin-top: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.4rem;
   color: #0b5fff;
   font-weight: 600;
 }
