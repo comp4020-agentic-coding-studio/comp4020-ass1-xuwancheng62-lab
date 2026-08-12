@@ -174,13 +174,21 @@ a {
   background: #7c3aed;
 }
 
+/* Two placements, one honest claim. Up by the controls this is a single line so
+   the race stays the focus; the full version sits under the statistics table,
+   next to the two numbers it qualifies (PLAN.md Amendment 4). */
 .variants {
-  margin: 0 0 1.5rem;
+  margin: -0.75rem 0 1.5rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #555;
+}
+
+.stats .variants {
+  margin: 1.5rem 0 0;
   border-left: 3px solid #ddd;
   padding-left: 0.75rem;
   font-size: 0.85rem;
-  line-height: 1.5;
-  color: #555;
 }
 
 .status {
@@ -226,13 +234,42 @@ a {
   padding: 0.4rem 0.5rem;
 }
 
-.stats tbody tr[data-fewest="true"] {
-  font-weight: 600;
+/* Three equal shape columns, so a column is read as one condition rather than
+   sized by how long its heading happens to be. */
+.matrix thead th:not(:first-child),
+.matrix tbody td {
+  width: 22%;
+}
+
+/* The average is the number being compared across columns, so it gets the size;
+   the win count is the same fact at lower resolution and sits under it. */
+.matrix .avg {
+  font-size: 1.05rem;
+}
+
+.matrix td small {
+  display: block;
+  font-size: 0.7rem;
+  color: #777;
+
+  /* One line always, so every row is the same height and the averages stay on a
+     scannable baseline across the three columns. */
+  white-space: nowrap;
+}
+
+/* Highlighted per column, not per table: this marks "fewest under this
+   condition", and the highlight moving between columns IS the finding. */
+.matrix tbody td[data-fewest="true"] {
+  background: #eef3ff;
+}
+
+.matrix tbody td[data-fewest="true"] .avg {
+  font-weight: 700;
   color: #0b5fff;
 }
 
 /* The variant note sits under the algorithm name in the same cell, so the
-   qualifier is impossible to read separately from the number it qualifies. */
+   qualifier is impossible to read separately from the numbers it qualifies. */
 .stats tbody th small {
   display: block;
   font-weight: 400;

@@ -48,6 +48,7 @@ const RACE_HTML = `<!doctype html><body>
   <button type="button" data-testid="stats-button"></button>
   <table>
     <caption><span data-testid="stats-scope"></span></caption>
+    <thead data-testid="stats-head"></thead>
     <tbody data-testid="stats-body"></tbody>
   </table>
 </body>`;
@@ -221,12 +222,13 @@ describe("the race", () => {
     }
   });
 
-  // The shape is one experimental condition shared by both halves of the page,
-  // so selecting it has to reach the race and the statistics alike -- and it has
-  // to clear statistics measured under the previous condition, because numbers
-  // from one shape sitting under a caption naming another is exactly the false
-  // claim this control exists to expose.
-  it("sends the selected shape to both the race and the statistics", () => {
+  // DELIBERATELY REWRITTEN for Amendment 4, not deleted. Under Amendment 3 this
+  // asserted the opposite half: that the selector drove the statistics too, and
+  // that changing it cleared the table. The IA correction makes the selector the
+  // race's condition alone -- the table now shows all three shapes at once, so
+  // there is no stale-caption mismatch left to clear. What survives unchanged is
+  // the half that was always right: the selector must reach the race.
+  it("sends the selected shape to the race, and leaves the statistics alone", () => {
     const dom = new JSDOM(RACE_HTML);
     const { document } = dom.window;
     initRace(document);
@@ -240,32 +242,23 @@ describe("the race", () => {
     document
       .querySelector('[data-testid="stats-button"]')!
       .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
-    expect(document.querySelectorAll('[data-testid="stats-body"] tr').length).toBeGreaterThan(0);
+    const before = document.querySelector('[data-testid="stats-body"]')!.innerHTML;
+    expect(before.length, "statistics did not render").toBeGreaterThan(0);
 
     shapeSelect.value = "nearlySorted";
     shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
 
     expect(
-      document.querySelectorAll('[data-testid="stats-body"] tr').length,
-      "statistics from the previous shape were left on screen",
-    ).toBe(0);
-    expect(document.querySelector('[data-testid="stats-scope"]')!.textContent).toContain(
-      "nearly-sorted",
-    );
+      document.querySelector('[data-testid="stats-body"]')!.innerHTML,
+      "changing the shape disturbed the statistics, which now cover all three shapes",
+    ).toBe(before);
 
-    // The race got the new shape too, not just the caption: a nearly-sorted
-    // array of 16 is measurably ordered where a random one is not.
+    // The race did get the new shape: a nearly-sorted array of 16 is measurably
+    // ordered where a random one is not.
     const bars = [...document.querySelectorAll('[data-testid="bars-a"] .bar')].map((bar) =>
       Number((bar as HTMLElement).dataset.value),
     );
     expect(inversions(bars), `race array was not nearly sorted: ${bars.join(", ")}`).toBeLessThanOrEqual(40);
-
-    document
-      .querySelector('[data-testid="stats-button"]')!
-      .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
-    expect(document.querySelector('[data-testid="stats-scope"]')!.textContent).toContain(
-      "nearly-sorted",
-    );
   });
 
   it("ends both panels sorted, each with a non-zero comparison count that then stops changing", () => {
@@ -360,7 +353,12 @@ describe("the race", () => {
     }
   });
 
-  it("fills the statistics table with one row per algorithm when asked", () => {
+  // DELIBERATELY REWRITTEN for Amendment 4, not deleted. This used to assert one
+  // row per algorithm with a single average each -- the table it described showed
+  // one shape at a time. The contract is now a matrix: every algorithm x shape
+  // pair gets a cell, so a column that silently failed to render would fail here
+  // rather than merely look like a narrower table.
+  it("fills the statistics table with a cell for every algorithm and every shape", () => {
     const dom = new JSDOM(RACE_HTML);
     const { document } = dom.window;
     initRace(document);
@@ -371,15 +369,86 @@ describe("the race", () => {
 
     const rows = [...document.querySelectorAll('[data-testid="stats-body"] tr')];
     expect(rows.length, "one row per algorithm").toBe(Object.keys(SORT_ALGORITHMS).length);
+
+    // The header is generated from the shape list, so it cannot drift out of step
+    // with the columns of data underneath it.
+    const headers = [...document.querySelectorAll('[data-testid="stats-head"] th[data-shape]')].map(
+      (th) => (th as HTMLElement).dataset.shape,
+    );
+    expect(headers, "column headers do not match the shape list").toEqual(SHAPE_KEYS);
+
     for (const key of Object.keys(SORT_ALGORITHMS)) {
-      const cell = document.querySelector(`[data-testid="stats-average-${key}"]`);
-      expect(cell, `no average reported for ${key}`).toBeTruthy();
-      expect(Number(cell!.textContent), `${key} average is not a positive number`).toBeGreaterThan(0);
+      for (const shape of SHAPE_KEYS) {
+        const cell = document.querySelector(`[data-testid="stats-cell-${key}-${shape}"]`);
+        expect(cell, `no cell for ${key} on ${shape}`).toBeTruthy();
+        const average = Number(cell!.querySelector(".avg")!.textContent);
+        expect(average, `${key}/${shape} average outside what a 16-item sort can do`).toBeGreaterThanOrEqual(15);
+        expect(average, `${key}/${shape} average outside what a 16-item sort can do`).toBeLessThanOrEqual(120);
+        expect(cell!.querySelector("small")!.textContent, `${key}/${shape} win count missing`).toMatch(
+          /^\d+\/20 won$/,
+        );
+      }
     }
+  });
+
+  // The highlight has to be per column, because "fewest" is only meaningful
+  // within one condition. Highlighting one cell of twelve would assert a single
+  // overall winner, which is the claim this whole iteration disproves.
+  it("marks the fewest-comparison cell once per shape, not once per table", () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+
+    document
+      .querySelector('[data-testid="stats-button"]')!
+      .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+
+    for (const [column, shape] of SHAPE_KEYS.entries()) {
+      const cells = [...document.querySelectorAll('[data-testid="stats-body"] tr')].map(
+        (tr) => tr.querySelectorAll("td")[column] as HTMLElement,
+      );
+      const averages = cells.map((cell) => Number(cell.querySelector(".avg")!.textContent));
+      const fewest = Math.min(...averages);
+      const marked = cells.filter((cell) => cell.dataset.fewest === "true");
+
+      expect(marked.length, `${shape} column marked ${marked.length} cells`).toBe(1);
+      expect(
+        Number(marked[0].querySelector(".avg")!.textContent),
+        `${shape} column highlighted a cell that is not the lowest (${averages.join(", ")})`,
+      ).toBe(fewest);
+    }
+  });
+
+  // Amendment 4's whole purpose, asserted on the rendered table rather than on
+  // the module: the two nearly-shapes must disagree about who wins, and they must
+  // disagree in one press without the reader switching anything. Only these two
+  // columns are asserted -- see the module-level test below for why Random's
+  // winner is deliberately left unasserted.
+  it("shows the ranking rearranging between columns in a single run", () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+
+    document
+      .querySelector('[data-testid="stats-button"]')!
+      .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+
+    const winnerOf = (shape: ShapeKey) =>
+      [...document.querySelectorAll('[data-testid="stats-body"] tr')].find(
+        (tr) =>
+          (tr.querySelector(`[data-testid$="-${shape}"]`) as HTMLElement | null)?.dataset.fewest === "true",
+      )?.getAttribute("data-algorithm");
+
+    expect(winnerOf("nearlySorted"), "nearly-sorted column should be won by insertion sort").toBe(
+      "insertion",
+    );
+    expect(winnerOf("nearlyReversed"), "nearly-reversed column should be won by merge sort").toBe(
+      "merge",
+    );
     expect(
-      document.querySelectorAll('[data-testid="stats-body"] tr[data-fewest="true"]').length,
-      "no row marked as using the fewest comparisons",
-    ).toBeGreaterThan(0);
+      winnerOf("nearlySorted"),
+      "the two nearly-shapes agreed on a winner, so nothing rearranged",
+    ).not.toBe(winnerOf("nearlyReversed"));
   });
 });
 
