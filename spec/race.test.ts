@@ -55,7 +55,6 @@ const IMPROVE_MARKUP = `
   <ol data-testid="finding-cards"></ol>
   <section data-testid="improve-area">
     <span data-testid="improve-title"></span>
-    <p data-testid="improve-finding"></p>
     <p data-testid="improve-change"></p>
     <button type="button" data-testid="improve-shuffle" disabled></button>
     <button type="button" data-testid="improve-race" disabled></button>
@@ -1008,22 +1007,80 @@ describe("the improvement race", () => {
       );
     const counter = (side: string) =>
       Number(document.querySelector(`[data-testid="improve-counter-${side}"]`)!.textContent);
-    return { dom, document, click, barValues, counter };
+    // Read off the rendered page rather than restated as a constant here: the
+    // cards' findings are functions of the array length, and a length typed into
+    // this file could go stale against the one the module actually draws.
+    const arrayLength = document.querySelectorAll('[data-testid="bars-a"] .bar').length;
+    return { dom, document, click, barValues, counter, arrayLength };
   };
 
-  it("offers one card per algorithm, each naming its finding and its improvement", () => {
-    const { document } = setup();
+  // Amendment 8: the card answers "what did we discover?" before "what could we
+  // change?", so this asserts the ORDER and not merely that both texts are
+  // somewhere in the card. Order is the whole request -- both strings were
+  // already present before the change, the wrong way round, and every check was
+  // green.
+  it("offers one card per algorithm, stating the finding above the improvement", () => {
+    const { document, arrayLength } = setup();
     const cards = [...document.querySelectorAll('[data-testid="finding-cards"] button')];
 
     expect(cards.length, "one card per algorithm").toBe(ALGORITHM_KEYS.length);
     for (const key of ALGORITHM_KEYS) {
       const card = cards.find((button) => (button as HTMLElement).dataset.algorithm === key);
       expect(card, `no card for ${key}`).toBeTruthy();
-      expect(card!.textContent, `card for ${key} omits its improvement`).toContain(
+
+      const finding = card!.querySelector(".card-finding");
+      const label = card!.querySelector(".card-label");
+      expect(finding?.textContent, `card for ${key} omits its finding`).toBe(
+        IMPROVEMENTS[key].finding(arrayLength),
+      );
+      expect(label?.textContent, `card for ${key} omits its improvement`).toContain(
         IMPROVEMENTS[key].label,
       );
-      expect(card!.textContent, `card for ${key} omits its finding`).toContain(IMPROVEMENTS[key].finding);
+
+      // DOCUMENT_POSITION_FOLLOWING: the finding element comes before the label
+      // element in the document, which is what a reader meets first.
+      const order = finding!.compareDocumentPosition(label!);
+      expect(
+        order & 4,
+        `card for ${key} shows the improvement before the finding`,
+      ).toBeGreaterThan(0);
+
+      // The improvement is offered as a proposal, not stated as a result: the
+      // card is a finding that suggests something, and the reader has not run it
+      // yet when they read the card.
+      expect(label!.textContent, `card for ${key} does not offer the change as a proposal`).toMatch(
+        /^Try:/,
+      );
+
+      // A true number can still make a false claim. Bubble's "120 comparisons
+      // every time" and Quick's "more work on nearly-sorted than on random" are
+      // both artefacts of the variants we implemented, so the card names the
+      // variant; insertion and merge are the ordinary versions and say nothing.
+      const variant = card!.querySelector(".card-variant");
+      if (ALGORITHM_VARIANTS[key]) {
+        expect(variant?.textContent, `${key}'s card does not name the variant it measured`).toBe(
+          ALGORITHM_VARIANTS[key],
+        );
+      } else {
+        expect(variant, `${key} is the ordinary version but its card claims a variant`).toBeNull();
+      }
     }
+  });
+
+  // The exact sentence CLAUDE.md exists for. "Doesn't adapt to its input" is true
+  // of two fixed loops and false of bubble sort, so the number and the variant
+  // that produced it have to be readable together, in the same card.
+  it("never lets bubble's flat count be read as a fact about bubble sort", () => {
+    const { document, arrayLength } = setup();
+    const card = document.querySelector('[data-testid="finding-card-bubble"]')!;
+    const text = card.textContent!;
+
+    expect(text, "bubble's card states a count").toContain(
+      String((arrayLength * (arrayLength - 1)) / 2),
+    );
+    expect(text, "bubble's card states its count without saying which bubble sort").toContain(
+      ALGORITHM_VARIANTS.bubble,
+    );
   });
 
   // The requested structure, asserted by counting: choosing a finding loads it
@@ -1199,50 +1256,86 @@ describe("the improvement race", () => {
    */
 
   // Reads the rendered table back as data, so these assert what a reader sees
-  // rather than what the module returned. Two number cells per row, each a big
-  // average with an optional small line under it -- the statistics matrix's cell
-  // anatomy, adopted wholesale in Amendment 7.
-  const readTable = (document: Document) =>
-    [...document.querySelectorAll('[data-testid="improve-stats-body"] tr')].map((row) => ({
-      shape: (row as HTMLElement).dataset.shape,
-      direction: (row as HTMLElement).dataset.direction,
-      cells: [...row.querySelectorAll("td")].map((cell) => ({
+  // rather than what the module returned.
+  //
+  // Amendment 8 transposed the table to match the statistics matrix: shapes
+  // across the top, Original and Improved down the side. So this now reads it by
+  // COLUMN -- one entry per shape, each holding the two cells being compared --
+  // because a column is the unit of comparison, exactly as it is in the matrix
+  // above. Cell anatomy is unchanged from Amendment 7: a big `.avg` with an
+  // optional `<small>` under it.
+  const readTable = (document: Document) => {
+    const body = document.querySelector('[data-testid="improve-stats-body"]')!;
+    const rows = [...body.querySelectorAll("tr")];
+    if (rows.length === 0) return [];
+
+    const readCell = (variant: string, shape: string) => {
+      const row = body.querySelector(`tr[data-variant="${variant}"]`);
+      const cell = row?.querySelector<HTMLElement>(`td[data-shape="${shape}"]`);
+      if (!cell) return null;
+      return {
         average: cell.querySelector(".avg")!.textContent!,
         note: cell.querySelector("small")?.textContent ?? null,
-        marked: (cell as HTMLElement).dataset.fewest === "true",
-      })),
+        marked: cell.dataset.fewest === "true",
+        direction: cell.dataset.direction ?? null,
+      };
+    };
+
+    // Driven off the header rather than off SHAPE_KEYS, so a column the header
+    // does not announce cannot be read as if it were labelled.
+    const shapes = [
+      ...document.querySelectorAll<HTMLElement>('[data-testid="improve-stats-head"] th[data-shape]'),
+    ].map((th) => th.dataset.shape!);
+
+    return shapes.map((shape) => ({
+      shape,
+      variantRows: rows.map((row) => (row as HTMLElement).dataset.variant),
+      original: readCell("original", shape),
+      improved: readCell("improved", shape),
     }));
+  };
 
   it("shows all three shapes as soon as a card is chosen, with no press", () => {
     const { document, click } = setup();
     expect(readTable(document).length, "the comparison was populated before any card").toBe(0);
 
     click("finding-card-insertion");
-    const rows = readTable(document);
-    expect(rows.map((row) => row.shape), "not one row per shape, in shape order").toEqual(SHAPE_KEYS);
+    const columns = readTable(document);
+    expect(columns.map((column) => column.shape), "not one column per shape, in shape order").toEqual(
+      SHAPE_KEYS,
+    );
 
-    for (const row of rows) {
-      const [original, improved] = row.cells;
-      expect(row.cells.length, `${row.shape}: not two number cells`).toBe(2);
-      expect(Number(original.average), `${row.shape}: original average is not a number`).toBeGreaterThan(0);
-      expect(Number(improved.average), `${row.shape}: improved average is not a number`).toBeGreaterThan(0);
-      expect(original.note, `${row.shape}: the original column grew a count of its own`).toBeNull();
+    for (const column of columns) {
+      const { original, improved } = column;
+      // Two rows, Original then Improved -- the layout the brief asked for, and
+      // the reason the highlight is now read downwards like the matrix's.
+      expect(column.variantRows, `${column.shape}: not Original then Improved`).toEqual([
+        "original",
+        "improved",
+      ]);
+      expect(Number(original!.average), `${column.shape}: original average is not a number`).toBeGreaterThan(0);
+      expect(Number(improved!.average), `${column.shape}: improved average is not a number`).toBeGreaterThan(0);
+      expect(original!.note, `${column.shape}: the original row grew a count of its own`).toBeNull();
 
-      // Won / tied / lost, all three, accounting for all 20 arrays. Moved under
-      // the improved average in Amendment 7, still three numbers.
-      const parts = improved.note!.split("/").map((part) => Number(part.trim()));
-      expect(parts.length, `${row.shape}: "${improved.note}" is not three counts`).toBe(3);
-      expect(parts.reduce((a, b) => a + b, 0), `${row.shape}: "${improved.note}" does not add to 20`).toBe(20);
+      // Won / tied / lost, all three, accounting for all 20 arrays. Under the
+      // Improved cell, once per column.
+      const parts = improved!.note!.split("/").map((part) => Number(part.trim()));
+      expect(parts.length, `${column.shape}: "${improved!.note}" is not three counts`).toBe(3);
+      expect(parts.reduce((a, b) => a + b, 0), `${column.shape}: "${improved!.note}" does not add to 20`).toBe(
+        20,
+      );
 
-      // The highlight is derived from the same two averages the row prints, via
-      // the same tolerance the module exports, so it cannot disagree with them.
-      const expected = averageDirection(Number(original.average), Number(improved.average));
+      // The highlight is derived from the same two averages the column prints,
+      // via the same tolerance the module exports, so it cannot disagree with
+      // them. The verdict is carried on the Improved cell, since that is the one
+      // that represents the change.
+      const expected = averageDirection(Number(original!.average), Number(improved!.average));
       expect(
-        row.direction,
-        `${row.shape}: marked ${row.direction} for ${original.average} vs ${improved.average}`,
+        improved!.direction,
+        `${column.shape}: marked ${improved!.direction} for ${original!.average} vs ${improved!.average}`,
       ).toBe(expected);
-      expect(original.marked, `${row.shape}: wrong cell highlighted`).toBe(expected === "worse");
-      expect(improved.marked, `${row.shape}: wrong cell highlighted`).toBe(expected === "better");
+      expect(original!.marked, `${column.shape}: wrong cell highlighted`).toBe(expected === "worse");
+      expect(improved!.marked, `${column.shape}: wrong cell highlighted`).toBe(expected === "better");
     }
   });
 
@@ -1250,18 +1343,17 @@ describe("the improvement race", () => {
     const { document, click } = setup();
     click("finding-card-quick");
 
-    for (const row of readTable(document)) {
-      const [original, improved] = row.cells;
-      const gap = Math.abs(Number(improved.average) - Number(original.average));
+    for (const { shape, original, improved } of readTable(document)) {
+      const gap = Math.abs(Number(improved!.average) - Number(original!.average));
       if (gap < AVERAGE_TOLERANCE) {
         expect(
-          [original.marked, improved.marked],
-          `${row.shape}: ${gap.toFixed(1)} apart and still marked`,
+          [original!.marked, improved!.marked],
+          `${shape}: ${gap.toFixed(1)} apart and still marked`,
         ).toEqual([false, false]);
       } else {
         expect(
-          original.marked || improved.marked,
-          `${row.shape}: ${gap.toFixed(1)} apart and marked nothing`,
+          original!.marked || improved!.marked,
+          `${shape}: ${gap.toFixed(1)} apart and marked nothing`,
         ).toBe(true);
       }
     }
@@ -1274,7 +1366,20 @@ describe("the improvement race", () => {
     for (const key of ALGORITHM_KEYS) {
       click(`finding-card-${key}`);
       expect(table.dataset.algorithm, `the comparison still belongs to another card`).toBe(key);
-      expect(readTable(document).length, `${key}: lost a shape row`).toBe(SHAPE_KEYS.length);
+      expect(readTable(document).length, `${key}: lost a shape column`).toBe(SHAPE_KEYS.length);
+
+      // Amendment 8: the two variants are named in the row headers as well, the
+      // same idiom the matrix above uses for its algorithms -- so a reader
+      // scanning the table alone still knows which code produced which row.
+      const rowHeaders = [
+        ...document.querySelectorAll('[data-testid="improve-stats-body"] th'),
+      ].map((th) => th.textContent!);
+      expect(rowHeaders.join(" | "), `${key}: a row header does not name its variant`).toContain(
+        IMPROVEMENTS[key].label,
+      );
+      expect(rowHeaders.join(" | "), `${key}: the original row does not name its variant`).toContain(
+        ALGORITHM_VARIANTS[key] || "ordinary version",
+      );
 
       // A true number can still make a false claim: which variant produced each
       // column travels with the numbers, not in a footnote elsewhere.
@@ -1288,6 +1393,24 @@ describe("the improvement race", () => {
     }
   });
 
+  // At most one cell marked per column, and none when the column is neutral. In
+  // the transposed table a second mark in a column would read as "both used
+  // fewer", which is not a thing two numbers can both be.
+  it("marks at most one of the two cells in any column", () => {
+    const { document, click } = setup();
+    for (const key of ALGORITHM_KEYS) {
+      click(`finding-card-${key}`);
+      for (const { shape, original, improved } of readTable(document)) {
+        const marks = [original!.marked, improved!.marked].filter(Boolean).length;
+        expect(marks, `${key}/${shape}: ${marks} cells marked in one column`).toBeLessThanOrEqual(1);
+        expect(
+          marks === 0,
+          `${key}/${shape}: direction ${improved!.direction} disagrees with ${marks} marks`,
+        ).toBe(improved!.direction === "same");
+      }
+    }
+  });
+
   it("offers a rerun only once a card is chosen, and keeps the table whole", () => {
     const { document, click } = setup();
     const rerun = document.querySelector('[data-testid="improve-rerun"]') as HTMLButtonElement;
@@ -1298,11 +1421,13 @@ describe("the improvement race", () => {
 
     for (let press = 0; press < 3; press++) {
       click("improve-rerun");
-      const rows = readTable(document);
-      expect(rows.map((row) => row.shape), `press ${press}: the table changed shape`).toEqual(SHAPE_KEYS);
-      for (const row of rows) {
-        const parts = row.cells[1].note!.split("/").map((part) => Number(part.trim()));
-        expect(parts.reduce((a, b) => a + b, 0), `press ${press}: ${row.shape} lost an array`).toBe(20);
+      const columns = readTable(document);
+      expect(columns.map((column) => column.shape), `press ${press}: the table changed shape`).toEqual(
+        SHAPE_KEYS,
+      );
+      for (const column of columns) {
+        const parts = column.improved!.note!.split("/").map((part) => Number(part.trim()));
+        expect(parts.reduce((a, b) => a + b, 0), `press ${press}: ${column.shape} lost an array`).toBe(20);
       }
     }
   });
@@ -1381,6 +1506,199 @@ describe("the improvement race", () => {
   });
 });
 
+/*
+ * The in-place colour (PLAN.md Amendment 8). "Green means this bar holds the
+ * value the sorted array holds at its index" is a claim about every frame, so it
+ * is checked on every frame -- of every algorithm, on every shape, in both races.
+ * A still of one frame proves nothing here: the interesting failures are the ones
+ * one frame either side of a correct-looking picture.
+ */
+describe("the in-place colour", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // What the colour claims, read straight off the rendered bars. Returns the
+  // marked indices and the indices that SHOULD be marked, so a failure can name
+  // both instead of just saying "false".
+  const inspect = (container: Element) => {
+    const bars = [...container.querySelectorAll<HTMLElement>(".bar")];
+    const values = bars.map((bar) => Number(bar.dataset.value));
+    const sorted = [...values].sort((a, b) => a - b);
+    // A bar being compared or used as a pivot right now shows THAT instead: the
+    // highlight the reader needs is the one about the current step. Computed from
+    // the roles the page actually set, and then held OUT of what green must cover
+    // -- deriving "should be green" from the green role itself would make this
+    // assertion agree with any implementation at all.
+    const busy = new Set(
+      bars.flatMap((bar, index) =>
+        bar.dataset.role === "compared" || bar.dataset.role === "pivot" ? [index] : [],
+      ),
+    );
+    return {
+      values,
+      busy: [...busy],
+      green: bars.flatMap((bar, index) => (bar.dataset.role === "in-place" ? [index] : [])),
+      shouldBeGreen: values.flatMap((value, index) =>
+        value === sorted[index] && !busy.has(index) ? [index] : [],
+      ),
+    };
+  };
+
+  // Steps one frame at a time rather than running all the timers: the claim is
+  // about the frames, and vi.runAllTimers() would only ever show the last one.
+  const eachFrame = (
+    document: Document,
+    containers: string[],
+    check: (frame: number, where: string, seen: ReturnType<typeof inspect>) => void,
+  ) => {
+    let frame = 0;
+    while (vi.getTimerCount() > 0 && frame < 2000) {
+      for (const testid of containers) {
+        check(frame, testid, inspect(document.querySelector(`[data-testid="${testid}"]`)!));
+      }
+      vi.advanceTimersToNextTimer();
+      frame++;
+    }
+    return frame;
+  };
+
+  for (const shape of SHAPE_KEYS) {
+    it(`the main race marks exactly the in-place bars, every frame, on ${shape} input`, () => {
+      for (const a of ALGORITHM_KEYS) {
+        const dom = new JSDOM(RACE_HTML);
+        const { document } = dom.window;
+        initRace(document);
+
+        const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+        shapeSelect.value = shape;
+        shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+        (document.querySelector('[data-testid="algorithm-select-a"]') as HTMLSelectElement).value = a;
+        document
+          .querySelector('[data-testid="race-button"]')!
+          .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+
+        const frames = eachFrame(document, ["bars-a"], (frame, where, seen) => {
+          expect(
+            seen.green,
+            `${a}/${shape} ${where} frame ${frame}: green is [${seen.green}] but in place is [${seen.shouldBeGreen}] (busy [${seen.busy}]) for [${seen.values}]`,
+          ).toEqual(seen.shouldBeGreen);
+        });
+        expect(frames, `${a}/${shape}: the race produced no frames`).toBeGreaterThan(1);
+
+        // And the end state is every bar in place, which is what makes the
+        // whole-panel green at the finish a consequence of the same rule rather
+        // than a second, unrelated signal.
+        const finished = inspect(document.querySelector('[data-testid="bars-a"]')!);
+        expect(
+          finished.values,
+          `${a}/${shape}: the finished panel is not sorted`,
+        ).toEqual([...finished.values].sort((x, y) => x - y));
+        expect(
+          finished.green.length,
+          `${a}/${shape}: finished with only ${finished.green.length} bars marked in place`,
+        ).toBe(finished.values.length);
+      }
+    });
+  }
+
+  for (const shape of SHAPE_KEYS) {
+    it(`the improvement race marks exactly the in-place bars, every frame, on ${shape} input`, () => {
+      for (const key of ALGORITHM_KEYS) {
+        const dom = new JSDOM(RACE_HTML);
+        const { document } = dom.window;
+        initRace(document);
+
+        const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+        shapeSelect.value = shape;
+        shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+        for (const testid of [`finding-card-${key}`, "improve-race"]) {
+          document
+            .querySelector(`[data-testid="${testid}"]`)!
+            .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+        }
+
+        // Both sides, because "consistently in both races" includes the improved
+        // variant -- and the improved generators are the newer code.
+        const sides = ["improve-bars-original", "improve-bars-improved"];
+        const frames = eachFrame(document, sides, (frame, where, seen) => {
+          expect(
+            seen.green,
+            `${key}/${shape} ${where} frame ${frame}: green is [${seen.green}] but in place is [${seen.shouldBeGreen}] (busy [${seen.busy}]) for [${seen.values}]`,
+          ).toEqual(seen.shouldBeGreen);
+        });
+        expect(frames, `${key}/${shape}: the improvement race produced no frames`).toBeGreaterThan(1);
+
+        for (const testid of sides) {
+          const finished = inspect(document.querySelector(`[data-testid="${testid}"]`)!);
+          expect(finished.values, `${key}/${shape} ${testid}: not sorted at the end`).toEqual(
+            [...finished.values].sort((x, y) => x - y),
+          );
+          expect(
+            finished.green.length,
+            `${key}/${shape} ${testid}: finished with only ${finished.green.length} bars marked`,
+          ).toBe(finished.values.length);
+        }
+      }
+    });
+  }
+
+  // The regression is not a bug -- it is bubble sort pushing a value back out of
+  // place, and seeing that happen is worth more than a monotone colour. But it is
+  // the cost of option A, so it is pinned here rather than left as a surprise: if
+  // a future change made the mark monotone, this test says so out loud instead of
+  // the page quietly starting to claim more than it can.
+  it("lets a bar lose the mark again, which is why the key says it can still move", () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+
+    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    shapeSelect.value = "nearlyReversed";
+    shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    (document.querySelector('[data-testid="algorithm-select-a"]') as HTMLSelectElement).value = "bubble";
+    document
+      .querySelector('[data-testid="race-button"]')!
+      .dispatchEvent(new dom.window.Event("click", { bubbles: true }));
+
+    // A bar that was green stays *remembered* through the frames where it is amber
+    // or violet, and only counts as regressed once it is neither green nor busy.
+    //
+    // I first wrote this forgetting an index the moment it went amber, and it found
+    // zero regressions for every algorithm and shape -- which is a real finding, not
+    // a broken test: bubble and insertion only move a value at the two indices they
+    // just compared, so a bar there is amber on the very frame its value leaves its
+    // final place. Green never turns straight to blue. It goes green -> amber ->
+    // blue, and that is still the reader watching the mark come off, so forgetting
+    // across the amber frame measured the wrong thing.
+    const everGreen = new Set<number>();
+    let regressions = 0;
+    eachFrame(document, ["bars-a"], (_frame, _where, seen) => {
+      const green = new Set(seen.green);
+      const busy = new Set(seen.busy);
+      for (const index of everGreen) {
+        if (!green.has(index) && !busy.has(index)) {
+          regressions++;
+          everGreen.delete(index);
+        }
+      }
+      for (const index of green) everGreen.add(index);
+    });
+
+    // Measured off the generators at 6.5 per run for bubble on nearly-reversed
+    // input, in 100% of 400 runs (5.0 per run, also 100%, on random), so 1 is a
+    // floor with a wide margin rather than a coin flip.
+    expect(
+      regressions,
+      "no bar ever lost the in-place mark -- either the mark went monotone or this input stopped being nearly reversed",
+    ).toBeGreaterThan(0);
+  });
+});
+
 // The tests above run against a fixture. This one runs against the file that
 // gets deployed, so a testid renamed in one place and not the other is a failure
 // here rather than a section that silently never initialises in the browser.
@@ -1415,6 +1733,82 @@ describe("the shipped index.html", () => {
         document.querySelector(`label[for="${id}"]`),
         `the ${id} slider has no label pointing at it`,
       ).toBeTruthy();
+    }
+  });
+
+  // Amendment 8: the page's story is four steps, and the four headings ARE the
+  // story. Asserted as an exact ordered list rather than as "contains", because
+  // an extra h2 or a reordering is exactly the failure this is here to catch --
+  // before the change the two panel titles were h2s sitting between the sections.
+  it("tells the story in four section headings, with everything else below them", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    expect(
+      [...document.querySelectorAll("main h2")].map((h) => h.textContent!.trim()),
+      "the four section headings are not Race / Statistics / What we found / Improvements",
+    ).toEqual(["Race", "Statistics", "What we found", "Improvements"]);
+
+    expect(document.querySelectorAll("main h1").length, "more than one page title").toBe(1);
+
+    // Nothing inside a section may compete with its heading. The two race panels
+    // were h2s until this amendment, which made "Side A" a sibling of "Statistics"
+    // in the document outline.
+    for (const selector of [".panel h2", ".improve h2"]) {
+      expect(
+        document.querySelectorAll(selector).length,
+        `${selector}: a nested heading is at section level`,
+      ).toBe(0);
+    }
+    expect(
+      [...document.querySelectorAll(".race .panel h3")].map((h) => h.textContent!.trim()),
+      "the race panels are not h3 titles",
+    ).toEqual(["Side A", "Side B"]);
+  });
+
+  // The findings section holds the discoveries; the improvements section holds the
+  // fixes and the race. Keeping them apart is the page-level half of "finding
+  // first, then the proposed improvement".
+  it("keeps the findings section free of the improvement race", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const findings = document.querySelector(".findings")!;
+
+    expect(findings.querySelector('[data-testid="finding-cards"]'), "the cards are not in Findings").toBeTruthy();
+    expect(
+      findings.querySelector('[data-testid="improve-area"]'),
+      "the improvement race is still inside the findings section",
+    ).toBeNull();
+    expect(
+      document.querySelector('#improve [data-testid="improve-area"]'),
+      "#improve does not contain the improvement race",
+    ).toBeTruthy();
+  });
+
+  // Both races draw with the same renderBars, so the key has to appear beside
+  // both -- a colour without a key is decoration. Amendment 8's brief said
+  // "consistently in both the main and improvement races"; this is that word.
+  it("gives both races the same three-colour key", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const legends = [...document.querySelectorAll(".legend")];
+    expect(legends.length, "not one key per race").toBe(2);
+
+    for (const legend of legends) {
+      expect(
+        [...legend.querySelectorAll("span[data-role]")].map((span) =>
+          (span as HTMLElement).dataset.role,
+        ),
+        "a race's key does not name all three highlight colours",
+      ).toEqual(["compared", "pivot", "in-place"]);
+    }
+
+    // The honest wording, not "sorted": the measurement says a bar takes this
+    // colour and loses it again about five times a run for bubble and insertion
+    // on random input, so the key must not promise the bar is finished.
+    for (const legend of legends) {
+      const text = legend.querySelector('span[data-role="in-place"]')!.textContent!;
+      expect(text, "the in-place key promises more than the colour means").toContain("can still move");
     }
   });
 

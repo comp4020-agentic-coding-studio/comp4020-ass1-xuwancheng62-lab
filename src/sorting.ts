@@ -351,8 +351,14 @@ export function comparisonFloor(length: number): number {
 export interface Improvement {
   /** Short name for the change, shown next to the algorithm's name. */
   label: string;
-  /** What the statistics matrix showed, which is what makes this worth trying. */
-  finding: string;
+  /**
+   * What the statistics matrix showed -- the discovery, stated before any fix is
+   * mentioned (PLAN.md Amendment 8). A function of array length for the same
+   * reason `expect` is: bubble's flat count is `length * (length - 1) / 2`
+   * exactly, and computing it means the card cannot drift from the table above
+   * it if the array length ever changes.
+   */
+  finding: (length: number) => string;
   /** What the improved code does differently. */
   change: string;
   /**
@@ -371,25 +377,48 @@ export interface Improvement {
  * improvement that targets it. Two of the four make things worse on some input
  * shapes, and say so here: that is the argument of the section, not a caveat on
  * it (PLAN.md Amendment 5).
+ *
+ * Amendment 8 rewrote every `finding` so the card states the discovery on its
+ * own terms, with no reference to the fix. Two of them changed meaning rather
+ * than wording, because measuring them showed the obvious phrasing was false:
+ *
+ * - Bubble's finding cannot say "doesn't adapt to its input" full stop. That is
+ *   true of these fixed loops and false of bubble sort, and the false reading is
+ *   the one a reader reaches, so the card carries `ALGORITHM_VARIANTS.bubble`
+ *   above it exactly as the statistics table's row header does.
+ * - Merge is NOT "the most stable across input shapes": over 2,000 samples per
+ *   cell, our bubble sort's three averages have a range of 0.0 against merge's
+ *   8.8, so bubble is the most stable of the four -- and its flatness is the
+ *   missing early exit, a defect rather than a virtue. Merge's card therefore
+ *   drops the superlative and gives its three averages instead, which is a
+ *   claim a reader can check against the row directly above the cards.
  */
 export const IMPROVEMENTS: Record<AlgorithmKey, Improvement> = {
   bubble: {
     label: "early exit",
-    finding: "Never responds to its data — the same average in all three columns.",
+    // n(n-1)/2 is exactly what two fixed loops do: n-1 passes, one fewer
+    // comparison each time. Computed, so it agrees with the table by
+    // construction rather than by my having checked once.
+    finding: (length) =>
+      `Doesn't adapt to its input — ${(length * (length - 1)) / 2} comparisons every time.`,
     change: "Stop as soon as a pass makes no swaps, which proves the array is already in order.",
     expect: () =>
       "Never costs more than the original, but a value still moves only one place per pass, so nearly-reversed input saves nothing.",
   },
   insertion: {
     label: "binary search",
-    finding: "The widest swing on the page: best on nearly-sorted, nearly the worst on nearly-reversed.",
+    finding: () =>
+      "Swings the widest of the four: cheapest on nearly-sorted, near-worst on nearly-reversed.",
     change: "Binary-search the sorted part for the right position instead of walking down to it.",
     expect: () =>
       "Trades the early break that won nearly-sorted input for a near-constant cost on any input.",
   },
   merge: {
     label: "skip ordered runs",
-    finding: "The steadiest and least adaptive: barely notices random from nearly-sorted.",
+    // "about", because these three are sample means over 20 arrays, not
+    // constants: 45.7 / 36.9 / 36.9 over 2,000 samples, and a single 20-array
+    // press lands a comparison or two either side.
+    finding: () => "Barely changes with the starting data: about 46, 37, 37.",
     change:
       "Before merging two sorted runs, spend one comparison asking whether they are already in order end to end, and skip the merge when they are.",
     expect: (length) =>
@@ -397,7 +426,8 @@ export const IMPROVEMENTS: Record<AlgorithmKey, Improvement> = {
   },
   quick: {
     label: "random pivot",
-    finding: "Worse on nearly-sorted input than on random, which is backwards.",
+    finding: () =>
+      "Pivot choice decides everything — more work on nearly-sorted input than on random.",
     change: "Pick the pivot at random, so the position of a value in the input no longer decides it.",
     expect: () =>
       "Improves the expected case, not the worst: a random pivot can still split badly, but no starting shape can force it.",

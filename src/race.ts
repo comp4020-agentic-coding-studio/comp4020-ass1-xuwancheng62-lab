@@ -55,6 +55,12 @@ function renderBars(
   marks: Pick<SortStep, "compared" | "pivot"> = {},
 ): void {
   const document = container.ownerDocument;
+  // Where each value BELONGS. Every frame is a permutation of the array the sort
+  // started from (asserted in spec/race.test.ts), so sorting this frame gives
+  // the same answer as sorting the input -- which is why the in-place mark needs
+  // no extra argument and works identically in both races and all four
+  // algorithms (PLAN.md Amendment 8, option A).
+  const sorted = [...values].sort((a, b) => a - b);
   container.replaceChildren(
     ...values.map((value, index) => {
       const bar = document.createElement("div");
@@ -63,11 +69,21 @@ function renderBars(
       bar.style.height = `${(value / max) * 100}%`;
       // data-role picks the highlight colour in styles.css. Pivot is checked
       // first so quick sort's pivot keeps its own colour even though it is also
-      // one of the two values being compared.
+      // one of the two values being compared; the in-place green is checked last
+      // so a bar being looked at right now still shows as such.
+      //
+      // "In its final place" is a fact about THIS frame, not a promise: a bar can
+      // take the green and lose it again, ~5 times a run for bubble and insertion
+      // on random input, and on nearly-sorted input about seven of sixteen bars
+      // are green before the first comparison. That is the input being nearly
+      // sorted, which is the thing the page is about, so the legend says "it can
+      // still move" rather than claiming the bar is done.
       if (marks.pivot === index) {
         bar.dataset.role = "pivot";
       } else if (marks.compared?.includes(index)) {
         bar.dataset.role = "compared";
+      } else if (value === sorted[index]) {
+        bar.dataset.role = "in-place";
       }
       return bar;
     }),
@@ -133,8 +149,11 @@ export function initRace(root: ParentNode): void {
   // shapes by name -- they are the column headings a centimetre above it, and
   // spelling them out ran this caption to eight lines on a phone. The array
   // length stays: it is stated nowhere else, and it is the limit on the claim.
+  // Amendment 8 folded "the identical 20 to all four algorithms" in here, out of
+  // the static caption: it is the same fact, and it belongs with the sample size
+  // rather than as its own sentence three lines further down.
   function describeStatsScope(): void {
-    statsScope!.textContent = `${STATS_RUNS} arrays of each shape, every array ${ARRAY_LENGTH} items long.`;
+    statsScope!.textContent = `${STATS_RUNS} arrays of each shape, every array ${ARRAY_LENGTH} items long — the identical ${STATS_RUNS} to all four algorithms.`;
   }
 
   // The selector is the race's condition only. It deliberately leaves the
@@ -317,7 +336,10 @@ export function initRace(root: ParentNode): void {
 
   const cardList = need('[data-testid="finding-cards"]');
   const improveTitle = need('[data-testid="improve-title"]');
-  const improveFinding = need('[data-testid="improve-finding"]');
+  // Amendment 8 deleted the line that repeated the chosen card's finding here.
+  // The finding is now the card's own main text, and the chosen card sits
+  // highlighted a few centimetres above this heading, so restating it was
+  // duplication rather than context.
   const improveChange = need('[data-testid="improve-change"]');
   const improveExpect = need('[data-testid="improve-expect"]');
   const improveShapeNote = need('[data-testid="improve-shape"]');
@@ -404,63 +426,95 @@ export function initRace(root: ParentNode): void {
     const variant = ALGORITHM_VARIANTS[algorithm] || "ordinary version";
     improveStatsScope.textContent = `${ALGORITHM_LABELS[algorithm]}, ${variant} vs ${improvement.label}: ${STATS_RUNS} arrays of each shape, the same ${STATS_RUNS} to both.`;
 
+    // Which of the two averages is marked in each column, or neither, with a
+    // measured tolerance so a difference the size of this sample's own noise
+    // reads as no difference (PLAN.md Amendment 7). Rounded to the one decimal
+    // the cells print *before* the comparison, so a reader subtracting the two
+    // numbers in a column gets the same answer the code did -- which is what the
+    // caption's "under 2.5 comparisons apart" promises.
+    const columns = new Map(
+      rows.map(({ shape, result }) => {
+        const printed = {
+          original: Number(result.originalAverage.toFixed(1)),
+          improved: Number(result.improvedAverage.toFixed(1)),
+        };
+        return [
+          shape,
+          {
+            printed,
+            record: `${result.improvedWins}/${result.ties}/${result.improvedLosses}`,
+            direction: averageDirection(printed.original, printed.improved),
+          },
+        ];
+      }),
+    );
+
+    // Amendment 8 transposed this table to match the statistics matrix above:
+    // shapes across the top, the two variants down the side. The highlight then
+    // moves DOWN a column here exactly as it does up there, so both tables are
+    // read the same way, and the row headers name the two variants in the same
+    // <small> idiom the matrix uses for its algorithms.
     const headerRow = document.createElement("tr");
-    for (const label of ["Starting data", "Original", "Improved"]) {
+    const corner = document.createElement("th");
+    corner.scope = "col";
+    corner.textContent = "Version";
+    headerRow.append(corner);
+    for (const shape of SHAPE_KEYS) {
       const th = document.createElement("th");
       th.scope = "col";
-      th.textContent = label;
+      th.dataset.shape = shape;
+      th.textContent = SHAPE_LABELS[shape];
       headerRow.append(th);
     }
     improveStatsHead.replaceChildren(headerRow);
 
+    const variantRows = [
+      { variantKey: "original" as const, label: "Original", note: variant },
+      { variantKey: "improved" as const, label: "Improved", note: improvement.label },
+    ];
+
     improveStatsBody.replaceChildren(
-      ...rows.map(({ shape, result }) => {
+      ...variantRows.map(({ variantKey, label, note }) => {
         const tr = document.createElement("tr");
-        tr.dataset.shape = shape;
+        tr.dataset.variant = variantKey;
 
         const name = document.createElement("th");
         name.scope = "row";
-        name.textContent = SHAPE_LABELS[shape];
+        name.textContent = label;
+        // Which version this row is, beside the numbers it produced -- the same
+        // reason the matrix above puts "no early exit" under "Bubble sort".
+        const small = document.createElement("small");
+        small.textContent = note;
+        name.append(small);
         tr.append(name);
 
-        // Which of the two averages is marked, or neither, with a measured
-        // tolerance so a difference the size of this sample's own noise reads as
-        // no difference (PLAN.md Amendment 7). Rounded to the one decimal the
-        // cells print *before* the comparison, so a reader subtracting the two
-        // numbers in the row gets the same answer the code did -- which is what
-        // the caption's "under 2.5 comparisons apart" promises.
-        const printed = [result.originalAverage, result.improvedAverage].map((average) =>
-          Number(average.toFixed(1)),
-        );
-        const direction = averageDirection(printed[0], printed[1]);
-        tr.dataset.direction = direction;
-
-        // Same cell anatomy as the statistics matrix above -- big average, small
-        // count of arrays underneath, and the blue data-fewest highlight on the
-        // fewer of the two. Reusing the matrix's markup and CSS rather than a
-        // second table style is the point: the finding is the highlight moving
-        // between the Original and Improved columns as you read down the shapes,
-        // which is exactly how that table is already read.
-        const cells: [number, string | null][] = [
-          [printed[0], null],
-          [printed[1], `${result.improvedWins} / ${result.ties} / ${result.improvedLosses}`],
-        ];
-        for (const [index, [average, record]] of cells.entries()) {
+        for (const shape of SHAPE_KEYS) {
+          const column = columns.get(shape)!;
           const cell = document.createElement("td");
+          cell.dataset.testid = `improve-cell-${variantKey}-${shape}`;
+          cell.dataset.shape = shape;
+
           const value = document.createElement("span");
           value.className = "avg";
-          value.textContent = average.toFixed(1);
+          value.textContent = column.printed[variantKey].toFixed(1);
           cell.append(value);
-          // Just the three counts, as short as the matrix's "7 fewest" above it.
-          // What they are is in the caption, once, rather than repeated in every
-          // row of every card.
-          if (record !== null) {
-            const note = document.createElement("small");
-            note.textContent = record;
-            cell.append(note);
+
+          // The win/tied/lost triple appears once per column, under the Improved
+          // cell it describes. On the Original row it would be the same three
+          // numbers read backwards, which is not a second fact.
+          if (variantKey === "improved") {
+            const record = document.createElement("small");
+            record.textContent = column.record;
+            cell.append(record);
+            // The column's verdict lives on the cell that carries the change, so
+            // a test (and a reader) can ask "what happened on nearly sorted?" of
+            // one element rather than of the pair.
+            cell.dataset.direction = column.direction;
           }
-          const marked = direction === (index === 0 ? "worse" : "better");
-          if (marked) cell.dataset.fewest = "true";
+
+          if (column.direction === (variantKey === "improved" ? "better" : "worse")) {
+            cell.dataset.fewest = "true";
+          }
           tr.append(cell);
         }
         return tr;
@@ -498,7 +552,6 @@ export function initRace(root: ParentNode): void {
     // One area, reloaded. Choosing a second card must not leave two races on the
     // page, which is why this writes into the same elements every time.
     improveTitle.textContent = `${ALGORITHM_LABELS[algorithm]} — ${improvement.label}`;
-    improveFinding.textContent = improvement.finding;
     // "Improved" has to say what was changed, or the reader is being asked to
     // trust a label. This is the one sentence of mechanism.
     improveChange.textContent = `What changed: ${improvement.change}`;
@@ -594,16 +647,35 @@ export function initRace(root: ParentNode): void {
     button.dataset.algorithm = algorithm;
     button.setAttribute("aria-pressed", "false");
 
+    // Amendment 8: the discovery first, the proposal second. Until now the blue
+    // improvement label sat directly under the algorithm's name and the finding
+    // was the grey afterthought, so the cards read as a menu of fixes. Reversed,
+    // they answer "what did we find?" before "what could we change?".
     const heading = document.createElement("strong");
     heading.textContent = ALGORITHM_LABELS[algorithm];
+    // Where our implementation is the reason for the finding, the variant is
+    // named on the card itself, in the same place and idiom as the statistics
+    // table's row headers. Without it "doesn't adapt to its input" reads as a
+    // claim about bubble sort rather than about these two fixed loops -- exactly
+    // the false implication CLAUDE.md is about. Empty for insertion and merge,
+    // which are the ordinary versions.
+    const variant = ALGORITHM_VARIANTS[algorithm];
+    if (variant) {
+      const note = document.createElement("small");
+      note.className = "card-variant";
+      note.textContent = variant;
+      heading.append(note);
+    }
+
+    const finding = document.createElement("span");
+    finding.className = "card-finding";
+    finding.textContent = improvement.finding(ARRAY_LENGTH);
+
     const label = document.createElement("span");
     label.className = "card-label";
-    label.textContent = improvement.label;
-    const finding = document.createElement("small");
-    finding.className = "card-finding";
-    finding.textContent = improvement.finding;
+    label.textContent = `Try: ${improvement.label}`;
 
-    button.append(heading, label, finding);
+    button.append(heading, finding, label);
     button.addEventListener("click", () => chooseFinding(algorithm));
     item.append(button);
     cardList.append(item);

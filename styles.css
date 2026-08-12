@@ -104,9 +104,16 @@ a {
   border-color: #0b5fff;
 }
 
-.panel h2 {
+/* Amendment 8: one size for the four section headings, a smaller one for
+   everything nested inside them. The four were all 1.1rem, the same as the panel
+   titles, so the page's four steps were distinguishable only by position. */
+main h2 {
+  font-size: 1.35rem;
+}
+
+.panel h3 {
   margin-top: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .panel label {
@@ -140,16 +147,25 @@ a {
   transition: height 60ms linear;
 }
 
-/* The two highlight colours are the explanation: amber = the pair being
-   compared right now, violet = quick sort's pivot. Both are more specific than
-   the plain .bar rule, and both lose to the sorted-panel rule below, so a
-   finished panel goes fully green. */
+/* The colours are the explanation: amber = the pair being compared right now,
+   violet = quick sort's pivot, green = this bar currently holds the value the
+   sorted array holds at its index. A bar carries at most one data-role (the
+   precedence is decided in renderBars, not here), so these three don't compete
+   -- they are separate rules only because each names its own colour.
+
+   Green is deliberately the same green a finished panel turns, so the whole-panel
+   green at the end reads as every bar being in place rather than as a second,
+   unrelated signal (PLAN.md Amendment 8). */
 .bar[data-role="compared"] {
   background: #f59e0b;
 }
 
 .bar[data-role="pivot"] {
   background: #7c3aed;
+}
+
+.bar[data-role="in-place"] {
+  background: #16a34a;
 }
 
 .panel[data-sorted="true"] .bar {
@@ -189,6 +205,18 @@ a {
   background: #7c3aed;
 }
 
+.legend span[data-role="in-place"]::before {
+  background: #16a34a;
+}
+
+/* The improvement race has its own copy of the key, sitting next to its own two
+   panels rather than 1500px above them -- the same decision as its own speed
+   slider. Tightened up because it is inside a panel that already has padding. */
+.improve .legend {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+}
+
 /* Two placements, one honest claim. Up by the controls this is a single line so
    the race stays the focus; the full version sits under the statistics table,
    next to the two numbers it qualifies (PLAN.md Amendment 4). */
@@ -213,16 +241,6 @@ a {
 
 .status output {
   font-weight: 600;
-}
-
-.stats {
-  margin-top: 2.5rem;
-  border-top: 1px solid #ddd;
-  padding-top: 1.5rem;
-}
-
-.stats h2 {
-  font-size: 1.1rem;
 }
 
 /* The improvement comparison is the same kind of object as the statistics matrix
@@ -258,22 +276,17 @@ a {
 
 /* Equal number columns, so a column is read as one condition rather than sized by
    how long its heading happens to be. Both tables use this class, so the
-   statistics matrix (three shape columns) and the improvement comparison (two
-   variant columns) share one type scale, one cell anatomy and one highlight
-   (PLAN.md Amendment 7). */
+   statistics matrix and the improvement comparison share one type scale, one cell
+   anatomy and one highlight (PLAN.md Amendment 7).
+
+   Amendment 7 also needed a 30% override for the comparison, which then had two
+   variant columns against the matrix's three shape columns, so 22% each left half
+   that table as an empty row-label column. Amendment 8 transposed the comparison
+   to the same three shape columns, so the override is gone: one width rule for
+   both tables, which is what sharing the class was for. */
 .matrix thead th:not(:first-child),
 .matrix tbody td {
   width: 22%;
-}
-
-/* The comparison has two number columns where the statistics matrix has three,
-   so 22% each left 56% of the table as an empty row-label column and pushed the
-   two numbers being compared apart. Measured at 1920: 478px of label against
-   two 188px columns; at 30% they sit as a pair. Same rule, adjusted for the
-   shape of the table rather than a second set of cell styles. */
-.improve .matrix thead th:not(:first-child),
-.improve .matrix tbody td {
-  width: 30%;
 }
 
 /* The average is the number being compared across columns, so it gets the size;
@@ -305,23 +318,25 @@ a {
   color: #0b5fff;
 }
 
-/* The variant note sits under the algorithm name in the same cell, so the
-   qualifier is impossible to read separately from the numbers it qualifies. */
-.stats tbody th small {
+/* The variant note sits under the row's name in the same cell, so the qualifier
+   is impossible to read separately from the numbers it qualifies. Both tables:
+   "no early exit" under Bubble sort in the matrix, and "early exit" under
+   Improved in the comparison. */
+.matrix tbody th small {
   display: block;
   font-weight: 400;
   font-size: 0.75rem;
   color: #666;
 }
 
-.findings {
+/* One rule for the three lower sections: the rule above each one is what makes
+   the four story steps visible as steps while scrolling. */
+.stats,
+.findings,
+.improvements {
   margin-top: 2.5rem;
   border-top: 1px solid #ddd;
   padding-top: 1.5rem;
-}
-
-.findings h2 {
-  font-size: 1.1rem;
 }
 
 /* auto-fit + minmax: the cards lay themselves out at whatever width they have --
@@ -363,16 +378,30 @@ a {
   font-size: 0.95rem;
 }
 
-.cards .card .card-label {
+/* Same treatment as the statistics table's row notes, because it is the same
+   qualifier doing the same job -- "these numbers are about OUR bubble sort". */
+.cards .card .card-variant {
   display: block;
-  color: #0b5fff;
-  font-weight: 600;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #666;
 }
 
+/* Amendment 8 swapped these two. The finding is now the card's body text in the
+   ordinary ink, and the improvement is the blue line under it -- so the card
+   reads discovery-then-proposal top to bottom, which is the order the DOM is in
+   too. It used to be the other way round. */
 .cards .card .card-finding {
   display: block;
   margin-top: 0.35rem;
-  color: #555;
+  color: #333;
+}
+
+.cards .card .card-label {
+  display: block;
+  margin-top: 0.4rem;
+  color: #0b5fff;
+  font-weight: 600;
 }
 
 .cards .card:hover {
@@ -425,12 +454,9 @@ a {
   flex-wrap: wrap;
 }
 
-.improve-finding {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #333;
-}
-
+/* .improve-finding was here until Amendment 8. It repeated the chosen card's
+   finding under this heading, and the finding is now the card's own main text
+   with the chosen card highlighted just above -- so it was duplication. */
 .improve-change {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
