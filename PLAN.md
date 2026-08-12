@@ -775,6 +775,185 @@ main race (two panels, shared array, winner by fewest comparisons, highlighting,
 locked selector mid-race), the 20-run sample size, and the array length of 16.
 No Bogo Sort, and the dead CSS transition still stays.
 
+## Amendment 6 — V1.6: 20 runs of every shape, per card (13 August 2026)
+
+**Not yet approved — written before any code, because this meets the trigger
+test twice over: it adds a block to a section and it changes what the reader can
+do.** Requested: keep the animated Original vs Improved race exactly as it is,
+and add a 20-run comparison below it showing Random, Nearly sorted and Nearly
+reversed *together* — Original average comparisons, Improved average
+comparisons, and Improved wins out of 20 — with the same generated arrays given
+to both variants in each trial, applied consistently to all four cards. Stated
+purpose: **an "improvement" may help on some input shapes but not others.** One
+part of the request is ambiguous and is raised in "The open question" below
+rather than settled quietly.
+
+### The gap this closes
+
+V1.5's animated race is one array. That is the right unit for *watching* the
+mechanism, and the wrong unit for *believing* the claim — and for two of the four
+cards the single race actively misleads:
+
+- **Quick + random pivot on random input is a coin flip.** Over 20,000 samples of
+  20 arrays each, the improved side won between 2 and 18 of the 20. A reader who
+  presses Race once on random input learns nothing about the pivot, but will
+  believe they did.
+- **Bubble + early exit on nearly-reversed input ties.** One race shows two equal
+  counters and no visible reason. The measured fact — tied on 15–20 of every 20
+  arrays, and *never once worse* in 400,000 arrays — is invisible in a single
+  race.
+
+The cards already state the direction in words. This iteration makes each card's
+claim checkable in the reader's own browser, across all three shapes at once, at
+the same 20-array sample size the statistics matrix already uses.
+
+### The structure
+
+Inside the one shared improvement area, **below** the two animated panels and
+below the "what to expect" line, a three-row table — one row per starting shape,
+all three always present:
+
+| Starting data | Original average | Improved average | Improved wins |
+| --- | --- | --- | --- |
+| Random | … | … | … / 20 |
+| Nearly sorted | … | … | … / 20 |
+| Nearly reversed | … | … | … / 20 |
+
+The animated race stays byte for byte what V1.5 shipped: same panels, same
+controls, same single array, same winner rule. Nothing is moved to make room.
+
+Each of the 60 trials generates one array and hands **that same array** to both
+variants, then counts both through `countVariantComparisons` — the same one
+definition of "a comparison" the animated race and the statistics matrix use,
+with each improvement's own bookkeeping included. Fairness is therefore
+structural: there is one array variable per trial and both counts read it, which
+is asserted in the tests rather than described in the caption.
+
+One press is 60 arrays × 2 variants = 120 sorts of 16 items. Measured at
+**0.3–1.0 ms** per press for all four algorithms (100 presses each, timed
+directly), so this runs synchronously on the click like the statistics button
+does, and needs no progress state.
+
+### What the reader will actually see, measured first
+
+Means and ranges over **20,000 samples of 20 arrays**, per algorithm per shape,
+through the generators that will ship. "won/tied" are counts out of 20:
+
+| Card | Shape | Original | Improved | Improved wins | Tied |
+| --- | --- | --- | --- | --- | --- |
+| Bubble + early exit | Random | 120.0 | 113.5 | 16.3 (9–20) | 3.7 |
+| | Nearly sorted | 120.0 | **67.3** | 19.5 (16–20) | 0.5 |
+| | Nearly reversed | 120.0 | 120.0 | **0.4 (0–5)** | **19.6 (15–20)** |
+| Insertion + binary search | Random | 72.6 | **45.0** | 19.9 (18–20) | 0.0 |
+| | Nearly sorted | 24.9 | *40.6* | **0.0 (0–1)** | 0.0 |
+| | Nearly reversed | 115.2 | **48.4** | 20.0 (20–20) | 0.0 |
+| Merge + skip ordered runs | Random | 45.7 | *55.2* | 0.0 (0–1) | 0.0 |
+| | Nearly sorted | 36.9 | **32.1** | 17.0 (9–20) | 1.1 |
+| | Nearly reversed | 36.9 | *50.9* | 0.0 (0–0) | 0.0 |
+| Quick + random pivot | Random | 51.0 | 51.0 | **9.6 (2–18)** | 0.9 |
+| | Nearly sorted | 94.8 | **51.0** | 19.7 (16–20) | 0.0 |
+| | Nearly reversed | 90.7 | **50.9** | 19.4 (15–20) | 0.1 |
+
+Every card ends up making the intended point on its own terms, which is why the
+block is worth adding to all four rather than to the two that lose:
+
+- **Bubble**: helps everywhere it can, does nothing where the fault isn't.
+- **Insertion**: the cleanest statement of the whole page — 19.9/20 on random,
+  0/20 on nearly sorted. Same code, same day, opposite verdicts.
+- **Merge**: 17/20 on one shape, 0/20 on the other two.
+- **Quick**: two decisive shapes and one shape where it is a coin flip, which is
+  what "improves the expected case, not every case" looks like as numbers.
+
+### Ties: the third column cannot be only "wins"
+
+Bubble on nearly-reversed input is the problem case. A bare **"Improved wins:
+0/20"** claims the fix failed. The measured truth is that the improved side tied
+on 15–20 of the 20 arrays and was **never worse on a single array in 400,000** —
+the fix is inapplicable there, not beaten. That is exactly the "a true number can
+still make a false claim" failure the harness rule exists for, so:
+
+**Decision: the three requested columns stay as the three columns, and the wins
+cell carries the tie count underneath it** as small text (`0 of 20 · 20 tied`),
+the same "big number, quieter number under it" pattern the statistics matrix
+already uses for its win counts. Plus a caption sentence: a win means the
+improved variant used *strictly fewer* comparisons on that array; identical
+counts are ties, counted separately and belonging to neither side.
+
+This is one addition beyond what was asked for, and it is flagged here rather
+than made silently. If you'd rather have exactly three numbers, say so and the
+tie count comes out — but then the Bubble card's nearly-reversed row reads as a
+failure it isn't.
+
+### When it runs
+
+**Decision: automatically when a card is chosen**, so the flow stays *one click*
+and the table is never an empty frame the reader has to notice a button for. Plus
+a **Run 20 more arrays of each shape** button in the same area to re-run it,
+because the wobble is itself a finding — pressing it repeatedly on the Quick card
+moves the random row's wins between 2 and 18 while the two decisive rows barely
+move, which is the difference between an expected-case improvement and a
+guaranteed one made visible without a word of copy.
+
+### The starting-data selector does not touch this table
+
+The table shows all three shapes at once, so the selector has nothing to select.
+This is the same decision Amendment 4 locked for the statistics matrix and for
+the same reason: a control that appears to change a table showing every value of
+the thing it controls is a lie about what the table is. The selector keeps
+governing the two races only — the main one and the animated improvement one.
+
+### The open question — "and speed adjustment also need"
+
+Two readings, and they need different code:
+
+1. **The improvement race needs its own speed control.** V1.5 decision 3 said
+   "no new selectors" and wired the improvement race to the *existing* slider up
+   by the main race — which works, and is ~1500px above the thing it controls at
+   390px wide. A reader who reaches the cards has no visible way to slow the
+   animation down.
+2. **The existing slider must reach the improvement race.** It already does:
+   `currentStepMs()` is read at every scheduled step, so dragging the top slider
+   changes the improvement race's speed mid-run.
+
+Since (2) already holds, I read the request as (1). **Proposed: a Speed slider in
+the improvement area's own controls, next to its New array and Race buttons**,
+same 2–50 range and same default as the main one, driving the improvement race
+only. Two independent sliders, each sitting beside the race it controls, rather
+than two views of one value that have to be kept in sync.
+
+This deliberately supersedes V1.5 decision 3 for speed only — the shape still
+comes from the existing selector. Per the frozen-plan rule I am not editing that
+decision; this amendment overrides it in the open, and if reading (2) was what
+you meant, the answer is that it already works and nothing needs building.
+
+### Decisions, locked (pending approval)
+
+1. **The animated race is unchanged.** Nothing about the panels, the single
+   array, the winner rule or the highlighting moves. The block is additive, and a
+   test asserts the animated race still runs after a comparison has been run.
+2. **Same array to both variants per trial**, one array variable read twice —
+   asserted structurally, not claimed in prose.
+3. **All four cards get the block**, driven by the same code path keyed by
+   algorithm, so a card cannot quietly lack it.
+4. **20 arrays per shape**, the existing sample size, so the numbers here and in
+   the statistics matrix mean the same thing.
+5. **Wins are strict**; ties are counted and shown, and belong to neither side.
+6. **No measured number is hard-coded into the page** — Amendment 5 decision 6
+   carries. The table above is the evidence for the test bounds, not values to
+   copy into markup.
+7. **The table clears when the card changes**, then repopulates for the new card,
+   so a reader can never read Bubble's numbers under Insertion's heading.
+8. **Averages are shown to one decimal**, matching the statistics matrix.
+
+### Explicitly unchanged
+
+The four original algorithms and the four improved ones, byte for byte. The input
+generators, the comparison metric, `comparisonStats`, `shapeSample`, the
+statistics matrix and its methodology, the main race, the four cards and their
+copy, the one-shared-area structure, the separate `IMPROVED_ALGORITHMS` registry,
+the 20-run sample size, and the array length of 16. No Bogo Sort, and the dead
+CSS transition still stays.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
@@ -860,6 +1039,33 @@ No Bogo Sort, and the dead CSS transition still stays.
   four cards plus a second race area still navigate at 390px; and whether the
   flow — choose a finding, then compare, then race — is discoverable without
   being told.
+- **Machine-checked, added by Amendment 6:** every card renders a comparison with
+  one row per shape and no shape missing (so a silently absent row fails rather
+  than looking like a shorter table); each row's two counts come from the same
+  array (asserted by running the comparison against a stubbed array source and
+  checking both variants received identical inputs); wins + ties + losses sum to
+  20 in every row; the table repopulates on a card change rather than keeping the
+  previous card's numbers; the animated race still completes after a comparison
+  has been run; and the Starting data selector leaves the table alone. Plus the
+  measured directions, each to be re-verified at the asserted bound before the
+  assertion is written — from 20,000 samples of 20 arrays, the bounds available
+  are: insertion+binary's nearly-sorted average is worse by 11.7–19.5 (0–1 wins of
+  20); merge+skip is worse by 7.5–11.3 on random and 13.3–14.7 on nearly reversed
+  (0–1 and 0–0 wins); bubble+early is better by 26.3–77.5 on nearly sorted (16–20
+  wins); insertion+binary is better by 62.1–69.8 on nearly reversed (20/20 wins);
+  quick+random is better by 22.4–59.0 on nearly sorted and nearly reversed (15–20
+  wins); and bubble+early on nearly reversed is within 0.3 of the original either
+  way with 15–20 of 20 tied. Quick's random row is deliberately **not** asserted
+  as a direction — 2–18 wins is the finding, and a test claiming otherwise would
+  be the flake this list exists to prevent.
+- **Judgement only, added by Amendment 6:** whether a reader connects the
+  three-row table to the single race above it as *the same comparison at a larger
+  sample* rather than as a second unrelated experiment; whether "0 of 20 · 20
+  tied" reads as "inapplicable here" rather than "failed"; whether two speed
+  sliders on one page read as local controls or as a contradiction; whether the
+  Quick card's moving numbers read as honesty rather than instability; and whether
+  the area at 390px still holds two stacked panels *plus* a four-column table
+  within one reasonable scroll of the card that opened it.
 - **Machine-checked, next step:** the core-interaction contract from "Design
   decisions forced by the spec" — triggering Race ends both panels'
   bar-height sequences in non-decreasing order, with each panel's comparison
