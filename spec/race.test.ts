@@ -64,6 +64,44 @@ describe("each sort algorithm", () => {
 
       expect(frame, `${key} yielded no intermediate frames`).toBeGreaterThan(0);
     });
+
+    // PLAN.md Amendment 1 item 4: the highlight is the explanation, so an
+    // out-of-range index would silently mark nothing (or the wrong bar) while
+    // every other check stayed green.
+    it(`${key}: reports in-range compared/pivot indices, and marks most frames`, () => {
+      const input = shuffledRange(16);
+      const generator = algorithm(input);
+
+      let frames = 0;
+      let marked = 0;
+      let sawPivot = false;
+      let result = generator.next();
+      while (!result.done) {
+        frames++;
+        const { compared, pivot } = result.value;
+        if (compared) {
+          marked++;
+          expect(compared, `${key} compared two identical indices`).not.toEqual([
+            compared[1],
+            compared[1],
+          ]);
+          for (const index of compared) {
+            expect(index, `${key} compared index out of range`).toBeGreaterThanOrEqual(0);
+            expect(index, `${key} compared index out of range`).toBeLessThan(input.length);
+          }
+        }
+        if (pivot !== undefined) {
+          sawPivot = true;
+          expect(pivot, `${key} pivot index out of range`).toBeGreaterThanOrEqual(0);
+          expect(pivot, `${key} pivot index out of range`).toBeLessThan(input.length);
+        }
+        result = generator.next();
+      }
+
+      // Most frames should say what was compared, or there is nothing to watch.
+      expect(marked / frames, `${key} marked only ${marked} of ${frames} frames`).toBeGreaterThan(0.5);
+      expect(sawPivot, `${key} pivot reporting`).toBe(key === "quick");
+    });
   }
 });
 

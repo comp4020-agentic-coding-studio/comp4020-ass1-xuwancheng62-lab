@@ -1,7 +1,15 @@
-import { ALGORITHM_LABELS, SORT_ALGORITHMS, shuffledRange, type AlgorithmKey } from "./sorting";
+import {
+  ALGORITHM_LABELS,
+  SORT_ALGORITHMS,
+  shuffledRange,
+  type AlgorithmKey,
+  type SortStep,
+} from "./sorting";
 
 const ARRAY_LENGTH = 16;
-const STEP_MS = 30;
+// 100ms, not the 30ms of V1: a highlighted comparison needs to stay on screen
+// long enough to read as "those two, specifically".
+const STEP_MS = 100;
 const PANEL_IDS = ["a", "b"] as const;
 type PanelId = (typeof PANEL_IDS)[number];
 
@@ -23,14 +31,27 @@ function getPanelRefs(root: ParentNode, id: PanelId): PanelRefs {
   return { section, select, bars, counter };
 }
 
-function renderBars(container: HTMLElement, values: number[], max: number): void {
+function renderBars(
+  container: HTMLElement,
+  values: number[],
+  max: number,
+  marks: Pick<SortStep, "compared" | "pivot"> = {},
+): void {
   const document = container.ownerDocument;
   container.replaceChildren(
-    ...values.map((value) => {
+    ...values.map((value, index) => {
       const bar = document.createElement("div");
       bar.className = "bar";
       bar.dataset.value = String(value);
       bar.style.height = `${(value / max) * 100}%`;
+      // data-role picks the highlight colour in styles.css. Pivot is checked
+      // first so quick sort's pivot keeps its own colour even though it is also
+      // one of the two values being compared.
+      if (marks.pivot === index) {
+        bar.dataset.role = "pivot";
+      } else if (marks.compared?.includes(index)) {
+        bar.dataset.role = "compared";
+      }
       return bar;
     }),
   );
@@ -67,7 +88,7 @@ export function initRace(root: ParentNode): void {
 
     function step(): void {
       const result = generator.next();
-      renderBars(panel.bars, result.value.array, ARRAY_LENGTH);
+      renderBars(panel.bars, result.value.array, ARRAY_LENGTH, result.value);
       panel.counter.textContent = String(result.value.comparisons);
       if (result.done) {
         panel.section.dataset.sorted = "true";

@@ -34,7 +34,14 @@ and see `spec/README.md` for how the checks in this repo relate to it.
   you the file, the line, or the contract. Treat a red check as authoritative
   --- the page is wrong until the check is green, not until you decide it should
   be.
-- Commit when the checks pass. Never commit a red state.
+- Commit when the checks pass. Never commit a red state. **One narrow
+  exception:** a regression test written deliberately ahead of its fix may be
+  committed failing, so the history shows the red-to-green instead of a fix
+  arriving with a test that never demonstrated the bug. The commit message must
+  say it is deliberately red and name what fails. The very next commit turns it
+  green. This does not license committing a red state for any other reason ---
+  a check that went red because something broke is still a stop-and-fix, not a
+  commit.
 
 ## Directing this project
 

@@ -3,7 +3,19 @@ export type AlgorithmKey = "bubble" | "merge" | "quick";
 export interface SortStep {
   array: number[];
   comparisons: number;
+  /** Indices of the two values just compared, so the UI can show the decision. */
+  compared?: readonly [number, number];
+  /** Quick sort only: the index its current partition is measuring against. */
+  pivot?: number;
 }
+
+/**
+ * What a nested generator reports about one step. The recursive algorithms
+ * (merge, quick) can't build a whole SortStep because they don't own the
+ * comparison counter, so they yield just the marks and the outer generator
+ * attaches the array and the count.
+ */
+type StepMark = Pick<SortStep, "compared" | "pivot">;
 
 // Each algorithm is a generator: calling it doesn't sort anything yet, it
 // hands back an iterator that runs one step (one comparison) per `.next()`
@@ -20,7 +32,8 @@ function* bubbleSort(input: number[]): SortGenerator {
       if (arr[j] > arr[j + 1]) {
         [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
       }
-      yield { array: [...arr], comparisons };
+      // Always an adjacent pair: that crawl is bubble sort's whole strategy.
+      yield { array: [...arr], comparisons, compared: [j, j + 1] };
     }
   }
   return { array: [...arr], comparisons };
@@ -30,7 +43,7 @@ function* mergeSort(input: number[]): SortGenerator {
   const arr = [...input];
   let comparisons = 0;
 
-  function* mergeRange(lo: number, hi: number): Generator<void> {
+  function* mergeRange(lo: number, hi: number): Generator<StepMark> {
     if (hi - lo <= 1) return;
     const mid = (lo + hi) >> 1;
     yield* mergeRange(lo, mid);
@@ -56,18 +69,27 @@ function* mergeSort(input: number[]): SortGenerator {
 
     while (i < left.length && j < right.length) {
       comparisons++;
-      merged.push(left[i] <= right[j] ? left[i++] : right[j++]);
+      const tookLeft = left[i] <= right[j];
+      merged.push(tookLeft ? left[i++] : right[j++]);
       commit();
-      yield;
+      // The winner is now the last element of the merged prefix; the value it
+      // beat is still waiting at the head of its own run. Highlighting those
+      // two shows merge sort choosing between the fronts of two sorted runs.
+      const placed = lo + merged.length - 1;
+      const beaten = tookLeft
+        ? lo + merged.length + (left.length - i)
+        : lo + merged.length;
+      yield { compared: [placed, beaten] };
     }
     while (i < left.length) merged.push(left[i++]);
     while (j < right.length) merged.push(right[j++]);
     commit();
-    yield;
+    // The tail flush compares nothing, so this frame carries no highlight.
+    yield {};
   }
 
-  for (const _ of mergeRange(0, arr.length)) {
-    yield { array: [...arr], comparisons };
+  for (const mark of mergeRange(0, arr.length)) {
+    yield { array: [...arr], comparisons, ...mark };
   }
   return { array: [...arr], comparisons };
 }
@@ -76,26 +98,32 @@ function* quickSort(input: number[]): SortGenerator {
   const arr = [...input];
   let comparisons = 0;
 
-  function* qs(lo: number, hi: number): Generator<void> {
+  function* qs(lo: number, hi: number): Generator<StepMark> {
     if (lo >= hi) return;
     const pivot = arr[hi];
     let store = lo;
     for (let i = lo; i < hi; i++) {
       comparisons++;
+      // Every value in this partition is measured against the one pivot, so the
+      // pivot stays marked while the scan sweeps past it -- the visible
+      // opposite of bubble sort's local adjacent pair.
+      let examined = i;
       if (arr[i] < pivot) {
         [arr[i], arr[store]] = [arr[store], arr[i]];
+        examined = store;
         store++;
       }
-      yield;
+      yield { compared: [examined, hi], pivot: hi };
     }
     [arr[store], arr[hi]] = [arr[hi], arr[store]];
-    yield;
+    // The pivot has landed in its final position; nothing was compared here.
+    yield { pivot: store };
     yield* qs(lo, store - 1);
     yield* qs(store + 1, hi);
   }
 
-  for (const _ of qs(0, arr.length - 1)) {
-    yield { array: [...arr], comparisons };
+  for (const mark of qs(0, arr.length - 1)) {
+    yield { array: [...arr], comparisons, ...mark };
   }
   return { array: [...arr], comparisons };
 }

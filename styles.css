@@ -93,8 +93,53 @@ a {
   transition: height 60ms linear;
 }
 
+/* The two highlight colours are the explanation: amber = the pair being
+   compared right now, violet = quick sort's pivot. Both are more specific than
+   the plain .bar rule, and both lose to the sorted-panel rule below, so a
+   finished panel goes fully green. */
+.bar[data-role="compared"] {
+  background: #f59e0b;
+}
+
+.bar[data-role="pivot"] {
+  background: #7c3aed;
+}
+
 .panel[data-sorted="true"] .bar {
   background: #16a34a;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  margin: -0.75rem 0 1.5rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.legend span {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* ::before is the colour swatch -- a decorative square with no text, so it
+   belongs in CSS rather than as an empty element in the markup. */
+.legend span::before {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  content: "";
+}
+
+.legend span[data-role="compared"]::before {
+  background: #f59e0b;
+}
+
+.legend span[data-role="pivot"]::before {
+  background: #7c3aed;
 }
 
 .status {
