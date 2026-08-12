@@ -76,6 +76,17 @@ like good practice.
   because a broken external image isn't a broken build. Fetch it, `curl` it, or
   read it off the live source before it goes in a file --- and tell me which of
   those you did, so I know the difference between checked and merely plausible.
+- **A true number can still make a false claim.** When a measurement on the page
+  depends on a variant I chose --- a fixed-loop bubble sort, a last-element
+  quicksort pivot --- name the variant next to the number. On assignment 1 the
+  nearly-sorted input shape made Bubble's flat 120.0 comparisons visible beside
+  Insertion's 24.8, and the honest reading of that is "our bubble sort has no
+  early exit", not "bubble sort can't exploit order" --- the second is false,
+  and it's the one a reader reaches. Every check stays green either way, because
+  nothing tests what a reader concludes. This is not the same as hedging an
+  uncertain fact: the number is exact and correct, and the implication is still
+  wrong. So the variant label travels with the number, in the table row or
+  beside the control, not in a footnote.
 - **Both viewports before you call it done.** 1920×1080 and 390×844 both count in
   full at marking. Look at the rendered page with `agent-browser` and tell me what
   you saw --- don't infer it from the CSS.
