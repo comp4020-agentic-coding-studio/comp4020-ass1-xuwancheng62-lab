@@ -158,6 +158,254 @@ export const SORT_ALGORITHMS: Record<AlgorithmKey, (input: number[]) => SortGene
   quick: quickSort,
 };
 
+/*
+ * ---------------------------------------------------------------------------
+ * The improved variants (PLAN.md Amendment 5).
+ *
+ * Each one repairs a weakness the statistics matrix exposed in the four above.
+ * They are deliberately written out in full rather than sharing a parameterised
+ * implementation with the originals: the originals produce every number in the
+ * statistics matrix, and Amendment 5 promised them unchanged, so nothing here
+ * is allowed to reach back into them. The cost is some repetition; the benefit
+ * is that no edit down here can move a number up there.
+ *
+ * They live in their own registry below, never in SORT_ALGORITHMS, which is why
+ * the main race cannot offer them: its dropdowns are built from that map.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Bubble sort that stops once a pass makes no swaps. */
+function* bubbleSortEarlyExit(input: number[]): SortGenerator {
+  const arr = [...input];
+  let comparisons = 0;
+  for (let i = 0; i < arr.length - 1; i++) {
+    // The whole improvement is this flag: a pass that swaps nothing proves the
+    // array is ordered, so every remaining pass would compare and change
+    // nothing. The original has no way to notice and runs all of them.
+    let swapped = false;
+    for (let j = 0; j < arr.length - 1 - i; j++) {
+      comparisons++;
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+      }
+      yield { array: [...arr], comparisons, compared: [j, j + 1] };
+    }
+    if (!swapped) break;
+  }
+  return { array: [...arr], comparisons };
+}
+
+/** Insertion sort that binary-searches for the insertion point. */
+function* binaryInsertionSort(input: number[]): SortGenerator {
+  const arr = [...input];
+  let comparisons = 0;
+  for (let i = 1; i < arr.length; i++) {
+    // Halve the sorted region instead of walking it. This is the only place on
+    // the page where a comparison is between two *distant* values rather than
+    // neighbours or a pivot -- the highlighted pair jumps around the sorted
+    // prefix, which is what the binary search looks like.
+    let lo = 0;
+    let hi = i;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      comparisons++;
+      const goesLeft = arr[i] < arr[mid];
+      yield { array: [...arr], comparisons, compared: [i, mid] };
+      if (goesLeft) hi = mid;
+      else lo = mid + 1;
+    }
+    // Then move the value into the position the search found, by adjacent swaps
+    // so every frame stays a permutation. These frames compare nothing, so the
+    // counter holds still while the bars shuffle -- that gap between frames and
+    // comparisons is the same one Amendment 2 settled for merge and quick.
+    for (let j = i; j > lo; j--) {
+      [arr[j], arr[j - 1]] = [arr[j - 1], arr[j]];
+      yield { array: [...arr], comparisons, compared: [j - 1, j] };
+    }
+  }
+  return { array: [...arr], comparisons };
+}
+
+/** Merge sort that skips a merge when the two runs are already in order. */
+function* mergeSortSkipping(input: number[]): SortGenerator {
+  const arr = [...input];
+  let comparisons = 0;
+
+  function* mergeRange(lo: number, hi: number): Generator<StepMark> {
+    if (hi - lo <= 1) return;
+    const mid = (lo + hi) >> 1;
+    yield* mergeRange(lo, mid);
+    yield* mergeRange(mid, hi);
+
+    // Both halves are sorted now, so if the left one ends below where the right
+    // one starts, the two are already in order end to end and the merge would
+    // just copy them back unchanged. One comparison can prove that. It is also
+    // charged when the answer is no, which is why this improvement can lose.
+    comparisons++;
+    const alreadyOrdered = arr[mid - 1] <= arr[mid];
+    yield { compared: [mid - 1, mid] };
+    if (alreadyOrdered) return;
+
+    const left = arr.slice(lo, mid);
+    const right = arr.slice(mid, hi);
+    const merged: number[] = [];
+    let i = 0;
+    let j = 0;
+
+    // Same permutation-safe view as the original merge sort (PLAN.md
+    // Amendment 1): the region always reads as the merged prefix followed by
+    // what is left of each run, so no frame can show a value twice.
+    function commit(): void {
+      const view = [...merged, ...left.slice(i), ...right.slice(j)];
+      for (let n = 0; n < view.length; n++) arr[lo + n] = view[n];
+    }
+
+    while (i < left.length && j < right.length) {
+      comparisons++;
+      const tookLeft = left[i] <= right[j];
+      merged.push(tookLeft ? left[i++] : right[j++]);
+      commit();
+      const placed = lo + merged.length - 1;
+      const beaten = tookLeft ? lo + merged.length + (left.length - i) : lo + merged.length;
+      yield { compared: [placed, beaten] };
+    }
+    while (i < left.length) merged.push(left[i++]);
+    while (j < right.length) merged.push(right[j++]);
+    commit();
+    yield {};
+  }
+
+  for (const mark of mergeRange(0, arr.length)) {
+    yield { array: [...arr], comparisons, ...mark };
+  }
+  return { array: [...arr], comparisons };
+}
+
+/** Quick sort that picks its pivot at random instead of taking the last value. */
+function* quickSortRandomPivot(input: number[]): SortGenerator {
+  const arr = [...input];
+  let comparisons = 0;
+
+  function* qs(lo: number, hi: number): Generator<StepMark> {
+    if (lo >= hi) return;
+    // Choosing at random costs no comparisons, and it is what stops the input
+    // shape from deciding the pivot: an already-ordered array no longer hands
+    // the original its worst case every time. The worst case still exists --
+    // random can still pick badly -- it just stops being forced (Amendment 5).
+    const choice = lo + Math.floor(Math.random() * (hi - lo + 1));
+    if (choice !== hi) {
+      [arr[choice], arr[hi]] = [arr[hi], arr[choice]];
+      // A frame with a pivot mark and no compared pair: the pivot has been
+      // chosen and moved, but nothing has been measured against it yet.
+      yield { pivot: hi };
+    }
+    const pivot = arr[hi];
+    let store = lo;
+    for (let i = lo; i < hi; i++) {
+      comparisons++;
+      let examined = i;
+      if (arr[i] < pivot) {
+        [arr[i], arr[store]] = [arr[store], arr[i]];
+        examined = store;
+        store++;
+      }
+      yield { compared: [examined, hi], pivot: hi };
+    }
+    [arr[store], arr[hi]] = [arr[hi], arr[store]];
+    yield { pivot: store };
+    yield* qs(lo, store - 1);
+    yield* qs(store + 1, hi);
+  }
+
+  for (const mark of qs(0, arr.length - 1)) {
+    yield { array: [...arr], comparisons, ...mark };
+  }
+  return { array: [...arr], comparisons };
+}
+
+/**
+ * One improvement per algorithm, keyed by the same names. Deliberately a
+ * separate map from SORT_ALGORITHMS: the main race builds its dropdowns from
+ * that one, so an improved variant cannot appear there by accident.
+ */
+export const IMPROVED_ALGORITHMS: Record<AlgorithmKey, (input: number[]) => SortGenerator> = {
+  bubble: bubbleSortEarlyExit,
+  insertion: binaryInsertionSort,
+  merge: mergeSortSkipping,
+  quick: quickSortRandomPivot,
+};
+
+/**
+ * The fewest comparisons any comparison sort can need for `length` distinct
+ * items: ceil(log2(length!)). Computed rather than written down, because it is
+ * the one number on the page that is a mathematical fact instead of a
+ * measurement, and it explains why merge sort has almost nothing left to win.
+ */
+export function comparisonFloor(length: number): number {
+  let bits = 0;
+  for (let k = 2; k <= length; k++) bits += Math.log2(k);
+  return Math.ceil(bits);
+}
+
+export interface Improvement {
+  /** Short name for the change, shown next to the algorithm's name. */
+  label: string;
+  /** What the statistics matrix showed, which is what makes this worth trying. */
+  finding: string;
+  /** What the improved code does differently. */
+  change: string;
+  /**
+   * What to expect, in words rather than numbers. A function of array length
+   * because merge's honest answer needs the comparison floor for that length --
+   * and every number a reader sees is computed in their browser, never typed
+   * into the source where it could drift from what the code does.
+   */
+  expect: (length: number) => string;
+}
+
+/**
+ * The four findings, each pairing a weakness the matrix exposed with the
+ * improvement that targets it. Two of the four make things worse on some input
+ * shapes, and say so here: that is the argument of the section, not a caveat on
+ * it (PLAN.md Amendment 5).
+ */
+export const IMPROVEMENTS: Record<AlgorithmKey, Improvement> = {
+  bubble: {
+    label: "early exit",
+    finding:
+      "The only algorithm that never responds to its data — the same average in all three columns, because our version always runs every pass.",
+    change: "Stop as soon as a pass makes no swaps, which proves the array is already in order.",
+    expect: () =>
+      "A large saving on nearly-sorted input, and none at all on nearly-reversed input: a value that has to travel left moves only one place per pass, so those arrays still need almost every pass. It can never cost more than the original.",
+  },
+  insertion: {
+    label: "binary search",
+    finding:
+      "Best of the four on nearly-sorted input and nearly the worst on nearly-reversed — the widest swing on the page, because it walks each value down one place at a time.",
+    change: "Binary-search the sorted part for the right position instead of walking down to it.",
+    expect: () =>
+      "Much better on random and nearly-reversed input, and clearly worse on nearly-sorted input. It gives up the early break that made it the nearly-sorted champion, and gets a near-constant cost on any input in exchange. That trade is the finding.",
+  },
+  merge: {
+    label: "skip ordered runs",
+    finding:
+      "The steadiest of the four, and the least adaptive: it barely notices the difference between random and nearly-sorted input, where insertion sort's average multiplies several times over.",
+    change:
+      "Before merging two sorted runs, spend one comparison asking whether they are already in order end to end, and skip the merge when they are.",
+    expect: (length) =>
+      `Better on nearly-sorted input, worse on the other two — the question is asked at every merge and most of the time the answer is no. There is also very little room: no comparison sort can beat ${comparisonFloor(length)} comparisons for ${length} items, and merge sort is already close to that.`,
+  },
+  quick: {
+    label: "random pivot",
+    finding:
+      "Worse on nearly-sorted input than on random input, which is backwards. Taking the last value as the pivot means an ordered array splits off one element at a time.",
+    change: "Pick the pivot at random, so the position of a value in the input no longer decides it.",
+    expect: () =>
+      "Much better on both nearly-ordered shapes and unchanged on random, at no cost in comparisons. It improves the expected behaviour, not the worst case: a random pivot can still split badly, so races on the same array will not all cost the same. What changes is that no starting shape can force the bad case any more.",
+  },
+};
+
 export const ALGORITHM_LABELS: Record<AlgorithmKey, string> = {
   bubble: "Bubble sort",
   insertion: "Insertion sort",
@@ -192,7 +440,20 @@ export interface AlgorithmStats {
  * generator the animation uses so there is one definition of "a comparison".
  */
 export function countComparisons(algorithm: AlgorithmKey, input: number[]): number {
-  const generator = SORT_ALGORITHMS[algorithm](input);
+  return countVariantComparisons(SORT_ALGORITHMS[algorithm], input);
+}
+
+/**
+ * The same count for any sort generator, so an improved variant is measured by
+ * the identical definition of "a comparison" as the original it is raced
+ * against -- including the bookkeeping the improvement itself spends (a skip
+ * test, a pivot swap). Excluding that would rig the race it appears in.
+ */
+export function countVariantComparisons(
+  sort: (input: number[]) => SortGenerator,
+  input: number[],
+): number {
+  const generator = sort(input);
   let result = generator.next();
   while (!result.done) result = generator.next();
   return result.value.comparisons;

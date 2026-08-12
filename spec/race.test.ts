@@ -1,12 +1,17 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { JSDOM } from "jsdom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { initRace } from "../src/race";
 import {
+  IMPROVED_ALGORITHMS,
+  IMPROVEMENTS,
   INPUT_SHAPES,
   SORT_ALGORITHMS,
   comparisonStats,
   countComparisons,
+  countVariantComparisons,
   shapeSample,
   shuffledRange,
   type AlgorithmKey,
@@ -38,6 +43,33 @@ const PANEL_MARKUP = (id: string) => `
   </section>
 `;
 
+// Amendment 5: the improvement race's markup. Kept in the fixture so these
+// tests stay about behaviour, with "the real index.html carries all of it" as a
+// separate test against the file itself -- otherwise the fixture could drift
+// into being the only page the suite has ever seen work.
+const IMPROVE_MARKUP = `
+  <ol data-testid="finding-cards"></ol>
+  <section data-testid="improve-area">
+    <span data-testid="improve-title"></span>
+    <p data-testid="improve-finding"></p>
+    <p data-testid="improve-change"></p>
+    <button type="button" data-testid="improve-shuffle" disabled></button>
+    <button type="button" data-testid="improve-race" disabled></button>
+    <span data-testid="improve-shape"></span>
+    <section data-testid="improve-panel-original">
+      <small data-testid="improve-variant-original"></small>
+      <div data-testid="improve-bars-original"></div>
+      <output data-testid="improve-counter-original">0</output>
+    </section>
+    <section data-testid="improve-panel-improved">
+      <small data-testid="improve-variant-improved"></small>
+      <div data-testid="improve-bars-improved"></div>
+      <output data-testid="improve-counter-improved">0</output>
+    </section>
+    <p data-testid="improve-expect"></p>
+  </section>
+`;
+
 const RACE_HTML = `<!doctype html><body>
   <button type="button" data-testid="shuffle-button"></button>
   <button type="button" data-testid="race-button"></button>
@@ -51,6 +83,7 @@ const RACE_HTML = `<!doctype html><body>
     <thead data-testid="stats-head"></thead>
     <tbody data-testid="stats-body"></tbody>
   </table>
+  ${IMPROVE_MARKUP}
 </body>`;
 
 // Amendment 3 parameterises these by starting shape. Every algorithm is now
@@ -526,5 +559,466 @@ describe("multi-run comparison statistics", () => {
       reversed.insertion,
       `insertion ${reversed.insertion} did not lose to merge ${reversed.merge} on nearly-reversed input`,
     ).toBeGreaterThan(reversed.merge);
+  });
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * PLAN.md Amendment 5: the improvement race. Four findings, one shared area,
+ * original against improved on the identical array.
+ * ---------------------------------------------------------------------------
+ */
+
+const ALGORITHM_KEYS = Object.keys(SORT_ALGORITHMS) as AlgorithmKey[];
+
+/** Arrays per sample for the directional claims below. See the margins note. */
+const CLAIM_SAMPLE = 200;
+
+/** Mean comparisons for one variant over its own fresh sample of one shape. */
+function meanOver(
+  sort: (input: number[]) => ReturnType<(typeof SORT_ALGORITHMS)[AlgorithmKey]>,
+  inputs: number[][],
+): number {
+  return inputs.reduce((sum, input) => sum + countVariantComparisons(sort, input), 0) / inputs.length;
+}
+
+// The improved variants animate in the same area as the originals, through the
+// same generator contract, so they get the same three checks the originals get.
+// Amendment 1's duplicate-bar bug was in a merge sort, and mergeSortSkipping is
+// a merge sort with a new early return in it.
+for (const shape of SHAPE_KEYS) {
+  describe(`each improved variant, on ${shape} input`, () => {
+    for (const key of ALGORITHM_KEYS) {
+      const improved = IMPROVED_ALGORITHMS[key];
+
+      it(`${key}: sorts the array and counts at least one comparison`, () => {
+        const input = INPUT_SHAPES[shape](16);
+        const generator = improved(input);
+        let result = generator.next();
+        while (!result.done) result = generator.next();
+
+        expect(result.value.comparisons).toBeGreaterThan(0);
+        for (let i = 1; i < result.value.array.length; i++) {
+          expect(result.value.array[i]).toBeGreaterThanOrEqual(result.value.array[i - 1]);
+        }
+      });
+
+      it(`${key}: every intermediate frame is a permutation of the input`, () => {
+        const input = INPUT_SHAPES[shape](16);
+        const expected = [...input].sort((a, b) => a - b);
+        const generator = improved(input);
+
+        let frame = 0;
+        let result = generator.next();
+        while (true) {
+          const actual = [...result.value.array].sort((a, b) => a - b);
+          expect(
+            actual,
+            `improved ${key} frame ${frame} on ${shape} input is not a permutation: [${result.value.array.join(", ")}]`,
+          ).toEqual(expected);
+          if (result.done) break;
+          frame++;
+          result = generator.next();
+        }
+
+        expect(frame, `improved ${key} yielded no intermediate frames`).toBeGreaterThan(0);
+      });
+
+      it(`${key}: reports in-range compared/pivot indices, and marks most frames`, () => {
+        const input = INPUT_SHAPES[shape](16);
+        const generator = improved(input);
+
+        let frames = 0;
+        let marked = 0;
+        let result = generator.next();
+        while (!result.done) {
+          frames++;
+          const { compared, pivot } = result.value;
+          if (compared) {
+            marked++;
+            expect(compared[0], `improved ${key} compared an index with itself`).not.toBe(compared[1]);
+            for (const index of compared) {
+              expect(index, `improved ${key} compared index out of range`).toBeGreaterThanOrEqual(0);
+              expect(index, `improved ${key} compared index out of range`).toBeLessThan(input.length);
+            }
+          }
+          if (pivot !== undefined) {
+            expect(pivot, `improved ${key} pivot index out of range`).toBeGreaterThanOrEqual(0);
+            expect(pivot, `improved ${key} pivot index out of range`).toBeLessThan(input.length);
+          }
+          result = generator.next();
+        }
+
+        expect(
+          marked / frames,
+          `improved ${key} marked only ${marked} of ${frames} frames on ${shape} input`,
+        ).toBeGreaterThan(0.5);
+      });
+    }
+  });
+}
+
+describe("the improved variants stay out of the main race", () => {
+  // Structural, not a matter of remembering: the main race builds its dropdowns
+  // from SORT_ALGORITHMS, and the improvements live in their own registry, so
+  // "no improved variants in the main race" is enforced by there being no route
+  // from one map to the other.
+  it("is a separate registry, sharing no function with the originals", () => {
+    expect(Object.keys(IMPROVED_ALGORITHMS).sort()).toEqual([...ALGORITHM_KEYS].sort());
+    for (const key of ALGORITHM_KEYS) {
+      expect(
+        Object.values(SORT_ALGORITHMS),
+        `improved ${key} is also registered as an original`,
+      ).not.toContain(IMPROVED_ALGORITHMS[key]);
+    }
+  });
+
+  it("leaves both main-race dropdowns offering the four originals only", () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+
+    for (const id of ["a", "b"]) {
+      const select = document.querySelector(`[data-testid="algorithm-select-${id}"]`) as HTMLSelectElement;
+      expect(
+        [...select.options].map((option) => option.value).sort(),
+        `side ${id} does not offer exactly the four originals`,
+      ).toEqual([...ALGORITHM_KEYS].sort());
+    }
+  });
+});
+
+/*
+ * The four claims the page makes, in the direction it makes them. Measured
+ * before being asserted: 2000 trials of a 200-array sample per algorithm per
+ * shape (400,000 arrays per cell), recording the extremes of the mean
+ * difference. Each bound below sits well inside the worst trial observed, so a
+ * failure here means the behaviour changed, not that a sample was unlucky:
+ *
+ *   bubble    nearlySorted    saved 44.08 to 60.14   asserted >= 30
+ *   bubble    nearlyReversed  saved  0.00 to  0.07   asserted within 1
+ *   insertion random          saved 25.18 to 29.98   asserted >= 15
+ *   insertion nearlyReversed  saved 65.72 to 67.86   asserted >= 40
+ *   insertion nearlySorted    cost  14.62 to 16.65   asserted >= 5
+ *   merge     nearlySorted    saved  3.85 to  5.90   asserted >= 1.5
+ *   merge     random          cost   9.06 to 10.12   asserted >= 4
+ *   merge     nearlyReversed  cost  13.85 to 14.21   asserted >= 7
+ *   quick     nearlySorted    saved 39.84 to 48.52   asserted >= 20
+ *   quick     nearlyReversed  saved 34.51 to 44.27   asserted >= 18
+ *   quick     random          moved -2.76 to +2.26   asserted within 6
+ */
+describe("what the improvement race claims", () => {
+  const claims: {
+    key: AlgorithmKey;
+    shape: ShapeKey;
+    direction: "saves" | "costs" | "unchanged";
+    margin: number;
+  }[] = [
+    { key: "bubble", shape: "nearlySorted", direction: "saves", margin: 30 },
+    { key: "bubble", shape: "nearlyReversed", direction: "unchanged", margin: 1 },
+    { key: "insertion", shape: "random", direction: "saves", margin: 15 },
+    { key: "insertion", shape: "nearlyReversed", direction: "saves", margin: 40 },
+    { key: "insertion", shape: "nearlySorted", direction: "costs", margin: 5 },
+    { key: "merge", shape: "nearlySorted", direction: "saves", margin: 1.5 },
+    { key: "merge", shape: "random", direction: "costs", margin: 4 },
+    { key: "merge", shape: "nearlyReversed", direction: "costs", margin: 7 },
+    { key: "quick", shape: "nearlySorted", direction: "saves", margin: 20 },
+    { key: "quick", shape: "nearlyReversed", direction: "saves", margin: 18 },
+    { key: "quick", shape: "random", direction: "unchanged", margin: 6 },
+  ];
+
+  for (const { key, shape, direction, margin } of claims) {
+    it(`${key} + ${IMPROVEMENTS[key].label} ${direction} on ${shape} input`, () => {
+      const inputs = shapeSample(shape, 16, CLAIM_SAMPLE);
+      const original = meanOver(SORT_ALGORITHMS[key], inputs);
+      const improved = meanOver(IMPROVED_ALGORITHMS[key], inputs);
+      const note = `${key}: original ${original.toFixed(2)}, improved ${improved.toFixed(2)} on ${shape}`;
+
+      if (direction === "saves") expect(original - improved, note).toBeGreaterThanOrEqual(margin);
+      if (direction === "costs") expect(improved - original, note).toBeGreaterThanOrEqual(margin);
+      if (direction === "unchanged") expect(Math.abs(improved - original), note).toBeLessThanOrEqual(margin);
+    });
+  }
+
+  // The one claim on the page that is absolute rather than average: an early
+  // exit can only ever stop the loop sooner. Checked per array, not on the mean,
+  // because a mean can hide an array where it cost something.
+  it("bubble's early exit never costs a single comparison, on any array", () => {
+    for (const shape of SHAPE_KEYS) {
+      for (const input of shapeSample(shape, 16, CLAIM_SAMPLE)) {
+        const original = countVariantComparisons(SORT_ALGORITHMS.bubble, input);
+        const improved = countVariantComparisons(IMPROVED_ALGORITHMS.bubble, input);
+        expect(improved, `early exit cost comparisons on [${input.join(", ")}]`).toBeLessThanOrEqual(
+          original,
+        );
+      }
+    }
+  });
+
+  // The honest half of the random pivot: it improves the expected cost, and the
+  // bad split is still reachable, so the same array does not cost the same twice.
+  // Measured: 12 races of one array give 9.5 distinct counts on average and were
+  // never all identical in 2000 trials per shape. Asserted across three arrays
+  // so one freak array cannot fail the suite.
+  it("quick sort's random pivot makes the same array cost different amounts", () => {
+    for (const shape of SHAPE_KEYS) {
+      const varied = shapeSample(shape, 16, 3).filter((input) => {
+        const counts = new Set(
+          Array.from({ length: 12 }, () => countVariantComparisons(IMPROVED_ALGORITHMS.quick, input)),
+        );
+        return counts.size > 1;
+      });
+      expect(varied.length, `random pivot was deterministic on all three ${shape} arrays`).toBeGreaterThan(
+        0,
+      );
+    }
+  });
+
+  // The original's counts must stay fixed for a given array, or the comparison
+  // above is measuring noise on both sides.
+  it("leaves the original quick sort deterministic", () => {
+    const input = INPUT_SHAPES.random(16);
+    const counts = new Set(Array.from({ length: 12 }, () => countComparisons("quick", input)));
+    expect(counts.size, `original quick sort varied: ${[...counts].join(", ")}`).toBe(1);
+  });
+});
+
+describe("the improvement race", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const setup = () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+    const click = (testid: string) =>
+      document.querySelector(`[data-testid="${testid}"]`)!.dispatchEvent(
+        new dom.window.Event("click", { bubbles: true }),
+      );
+    const barValues = (side: string) =>
+      [...document.querySelectorAll(`[data-testid="improve-bars-${side}"] .bar`)].map((bar) =>
+        Number((bar as HTMLElement).dataset.value),
+      );
+    const counter = (side: string) =>
+      Number(document.querySelector(`[data-testid="improve-counter-${side}"]`)!.textContent);
+    return { dom, document, click, barValues, counter };
+  };
+
+  it("offers one card per algorithm, each naming its finding and its improvement", () => {
+    const { document } = setup();
+    const cards = [...document.querySelectorAll('[data-testid="finding-cards"] button')];
+
+    expect(cards.length, "one card per algorithm").toBe(ALGORITHM_KEYS.length);
+    for (const key of ALGORITHM_KEYS) {
+      const card = cards.find((button) => (button as HTMLElement).dataset.algorithm === key);
+      expect(card, `no card for ${key}`).toBeTruthy();
+      expect(card!.textContent, `card for ${key} omits its improvement`).toContain(
+        IMPROVEMENTS[key].label,
+      );
+      expect(card!.textContent, `card for ${key} omits its finding`).toContain(IMPROVEMENTS[key].finding);
+    }
+  });
+
+  // The requested structure, asserted by counting: choosing a finding loads it
+  // into the ONE area, so four cards can never become four races on the page.
+  it("loads every card into the same single area, replacing what was there", () => {
+    const { document, click } = setup();
+    const seen = new Set<string>();
+
+    for (const key of ALGORITHM_KEYS) {
+      click(`finding-card-${key}`);
+      expect(document.querySelectorAll('[data-testid="improve-area"]').length, "more than one race area").toBe(
+        1,
+      );
+      expect(document.querySelectorAll('[data-testid^="improve-bars-"]').length, "more than two bar rows").toBe(
+        2,
+      );
+
+      const area = document.querySelector('[data-testid="improve-area"]') as HTMLElement;
+      expect(area.dataset.algorithm, `area did not switch to ${key}`).toBe(key);
+      const title = document.querySelector('[data-testid="improve-title"]')!.textContent!;
+      expect(title, `title did not switch to ${key}`).toContain(IMPROVEMENTS[key].label);
+      seen.add(title);
+
+      // The mechanism, not just the label: "improved" has to say what changed.
+      expect(document.querySelector('[data-testid="improve-change"]')!.textContent).toContain(
+        IMPROVEMENTS[key].change,
+      );
+      expect(document.querySelector('[data-testid="improve-expect"]')!.textContent!.length).toBeGreaterThan(
+        0,
+      );
+    }
+
+    expect(seen.size, "the four cards did not each change the area").toBe(ALGORITHM_KEYS.length);
+  });
+
+  // Choose a finding -> Original vs Improved -> Race, in that order, enforced by
+  // the controls rather than by instructions in the copy.
+  it("keeps its controls disabled until a finding is chosen", () => {
+    const { document, click, barValues } = setup();
+    const shuffle = document.querySelector('[data-testid="improve-shuffle"]') as HTMLButtonElement;
+    const raceButton = document.querySelector('[data-testid="improve-race"]') as HTMLButtonElement;
+
+    expect(shuffle.disabled, "New array was live before a finding was chosen").toBe(true);
+    expect(raceButton.disabled, "Race was live before a finding was chosen").toBe(true);
+    expect(barValues("original").length, "bars were drawn before a finding was chosen").toBe(0);
+
+    // Pressing the disabled Race must also do nothing if it is reached anyway.
+    click("improve-race");
+    vi.runAllTimers();
+    expect(barValues("original").length, "the disabled Race button still ran").toBe(0);
+
+    click("finding-card-bubble");
+    expect(shuffle.disabled, "New array stayed disabled after choosing").toBe(false);
+    expect(raceButton.disabled, "Race stayed disabled after choosing").toBe(false);
+    expect(barValues("original").length, "no array was drawn on choosing").toBe(16);
+  });
+
+  it("gives both sides the identical array, on every card and every press", () => {
+    const { click, barValues } = setup();
+    for (const key of ALGORITHM_KEYS) {
+      click(`finding-card-${key}`);
+      for (let press = 0; press < 5; press++) {
+        click("improve-shuffle");
+        expect(barValues("original").length, `no bars for ${key}`).toBe(16);
+        expect(barValues("original"), `${key}: the two sides got different arrays`).toEqual(
+          barValues("improved"),
+        );
+      }
+    }
+  });
+
+  // No second shape selector: the improvement race reads the same control the
+  // main race does, so the two are always asking about the same condition.
+  it("takes its starting shape from the existing selector", () => {
+    const { dom, document, click, barValues } = setup();
+    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    click("finding-card-quick");
+
+    shapeSelect.value = "nearlySorted";
+    shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    const ordered = barValues("original");
+    expect(ordered, "the two sides diverged on a shape change").toEqual(barValues("improved"));
+    expect(inversions(ordered), `not nearly sorted: ${ordered.join(", ")}`).toBeLessThanOrEqual(40);
+
+    expect(
+      document.querySelector('[data-testid="improve-shape"]')!.textContent,
+      "the area does not say which shape it is racing",
+    ).toContain("nearly sorted");
+  });
+
+  it("ends both sides sorted, with counts that then stop changing", () => {
+    const { document, click, barValues, counter } = setup();
+    click("finding-card-insertion");
+    click("improve-race");
+    vi.runAllTimers();
+
+    for (const side of ["original", "improved"]) {
+      const panel = document.querySelector(`[data-testid="improve-panel-${side}"]`) as HTMLElement;
+      expect(panel.dataset.sorted, `${side} never reported sorted`).toBe("true");
+      const values = barValues(side);
+      for (let i = 1; i < values.length; i++) {
+        expect(values[i], `${side} bars out of order: ${values.join(", ")}`).toBeGreaterThanOrEqual(
+          values[i - 1],
+        );
+      }
+      const before = counter(side);
+      expect(before, `${side} counted no comparisons`).toBeGreaterThan(0);
+      vi.runAllTimers();
+      expect(counter(side), `${side} kept counting after sorting`).toBe(before);
+    }
+  });
+
+  it("marks the winner by fewest comparisons, for every card", () => {
+    const { document, click, counter } = setup();
+
+    for (const key of ALGORITHM_KEYS) {
+      click(`finding-card-${key}`);
+      click("improve-race");
+      vi.runAllTimers();
+
+      const counts = { original: counter("original"), improved: counter("improved") };
+      const fewest = Math.min(counts.original, counts.improved);
+      for (const side of ["original", "improved"] as const) {
+        const panel = document.querySelector(`[data-testid="improve-panel-${side}"]`) as HTMLElement;
+        expect(
+          panel.dataset.winner === "true",
+          `${key}: ${side} made ${counts[side]} comparisons, fewest was ${fewest}`,
+        ).toBe(counts[side] === fewest);
+      }
+    }
+  });
+
+  // Racing the same array again has to be possible, because for quick sort the
+  // repeat is the finding: the improvement is expected-case, so two races of one
+  // array can disagree.
+  it("can race the same array again, and clears the previous result first", () => {
+    const { document, click, counter } = setup();
+    click("finding-card-quick");
+
+    click("improve-race");
+    vi.runAllTimers();
+    const firstOriginal = counter("original");
+    expect(counter("improved"), "the first race produced no count").toBeGreaterThan(0);
+
+    click("improve-race");
+    const panel = document.querySelector('[data-testid="improve-panel-original"]') as HTMLElement;
+    expect(panel.dataset.winner, "last race's winner border survived into the next race").toBeUndefined();
+    expect(panel.dataset.sorted, "the panel still claimed to be sorted mid-race").toBeUndefined();
+    vi.runAllTimers();
+
+    // The bars end sorted, so they cannot show whether the array was reused. The
+    // ORIGINAL quick sort is deterministic for a given array (asserted above),
+    // so an identical count on both races is the evidence that no new array was
+    // generated -- and the improved side is free to differ, which is the point.
+    expect(counter("original"), "the re-race started from a different array").toBe(firstOriginal);
+    expect(counter("improved"), "the re-race produced no count").toBeGreaterThan(0);
+  });
+
+  it("locks the shape selector while it is racing, and unlocks it afterwards", () => {
+    const { document, click } = setup();
+    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    click("finding-card-merge");
+    expect(shapeSelect.disabled, "selector was locked before any race").toBe(false);
+
+    click("improve-race");
+    expect(shapeSelect.disabled, "the condition was changeable mid-race").toBe(true);
+    vi.runAllTimers();
+    expect(shapeSelect.disabled, "selector stayed locked after the race").toBe(false);
+  });
+});
+
+// The tests above run against a fixture. This one runs against the file that
+// gets deployed, so a testid renamed in one place and not the other is a failure
+// here rather than a section that silently never initialises in the browser.
+describe("the shipped index.html", () => {
+  const html = readFileSync(resolve("index.html"), "utf8");
+
+  it("carries the markup the race needs, and exactly one improvement area", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    expect(() => initRace(document)).not.toThrow();
+
+    expect(document.querySelectorAll('[data-testid="improve-area"]').length).toBe(1);
+    expect(document.querySelectorAll('[data-testid="finding-cards"]').length).toBe(1);
+    expect(document.querySelectorAll('[data-testid="finding-cards"] button').length).toBe(
+      ALGORITHM_KEYS.length,
+    );
+    expect(document.querySelectorAll('[data-testid^="improve-bars-"]').length).toBe(2);
+  });
+
+  // The findings section is what the statistics paragraph now points at.
+  it("links the corrected bubble-sort claim to the section that races it", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const detail = document.querySelector("#variant-detail")!;
+    const target = detail.querySelector('a[href^="#"]')!.getAttribute("href")!;
+    expect(document.querySelector(target), `${target} is not on the page`).toBeTruthy();
+    expect(document.querySelector(target)!.querySelector('[data-testid="improve-area"]')).toBeTruthy();
   });
 });

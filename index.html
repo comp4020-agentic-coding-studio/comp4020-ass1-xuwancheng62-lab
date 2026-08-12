@@ -114,14 +114,69 @@
           Two of those columns say more about our code than about the
           algorithms. <strong>Bubble sort</strong> here is the basic fixed-loop
           version with no early exit, so it makes the same 120 comparisons in
-          all three columns — a bubble sort that stops early when a pass finds
-          nothing to swap would be among the fastest on nearly-sorted input, not
-          the slowest. <strong>Quick sort</strong> here always takes the last
-          value as its pivot, which is why it does <em>more</em> work on
-          nearly-ordered data than on random; picking the pivot at random, or as
-          the median of three, avoids that. Insertion and merge sort are the
-          ordinary versions, so their columns are about the algorithms.
+          all three columns. Adding that early exit cuts its nearly-sorted
+          average by nearly half — but it still lands third of the four there,
+          ahead of only our own quick sort, so the flat 120 is our fault and the
+          low ranking mostly isn't. <strong>Quick sort</strong> here always takes
+          the last value as its pivot, which is why it does <em>more</em> work on
+          nearly-ordered data than on random. Insertion and merge sort are the
+          ordinary versions, so their columns are about the algorithms. Both
+          choices can be repaired, and
+          <a href="#improve">the section below races the repairs</a> rather than
+          asking you to take our word for it.
         </p>
+      </section>
+
+      <section class="findings" id="improve">
+        <h2>What we found — and does fixing it help?</h2>
+        <p>
+          Two of those four numbers are our fault, not the algorithm's. So we
+          fixed all four and raced each fix against the original on the same
+          array. Two of the four fixes average <em>worse</em> than the original
+          on some starting shapes — not just on an unlucky array — which is the
+          more interesting result: an improvement is only an improvement for
+          particular data.
+        </p>
+        <ol class="cards" data-testid="finding-cards"></ol>
+
+        <section class="improve" data-testid="improve-area">
+          <h3>
+            <span data-testid="improve-title">Pick a finding above</span>
+          </h3>
+          <p class="improve-finding" data-testid="improve-finding">
+            Each card loads its algorithm here, original against improved, both
+            starting from the identical array.
+          </p>
+          <p class="improve-change" data-testid="improve-change"></p>
+          <div class="controls">
+            <button type="button" data-testid="improve-shuffle" disabled>
+              New array
+            </button>
+            <button type="button" data-testid="improve-race" disabled>
+              Race
+            </button>
+            <span class="improve-shape" data-testid="improve-shape"></span>
+          </div>
+          <div class="panels">
+            <section class="panel" data-testid="improve-panel-original">
+              <h4>Original <small data-testid="improve-variant-original"></small></h4>
+              <div class="bars" data-testid="improve-bars-original"></div>
+              <p class="status">
+                <output data-testid="improve-counter-original">0</output>
+                comparisons
+              </p>
+            </section>
+            <section class="panel" data-testid="improve-panel-improved">
+              <h4>Improved <small data-testid="improve-variant-improved"></small></h4>
+              <div class="bars" data-testid="improve-bars-improved"></div>
+              <p class="status">
+                <output data-testid="improve-counter-improved">0</output>
+                comparisons
+              </p>
+            </section>
+          </div>
+          <p class="improve-expect" data-testid="improve-expect"></p>
+        </section>
       </section>
     </main>
     <script type="module" src="./main.ts"></script>

@@ -1,6 +1,8 @@
 import {
   ALGORITHM_LABELS,
   ALGORITHM_VARIANTS,
+  IMPROVED_ALGORITHMS,
+  IMPROVEMENTS,
   INPUT_SHAPES,
   SHAPE_DESCRIPTIONS,
   SHAPE_LABELS,
@@ -141,6 +143,11 @@ export function initRace(root: ParentNode): void {
   function changeShape(): void {
     if (racing) return;
     newStart();
+    // Amendment 5: the improvement race takes its condition from this same
+    // selector rather than adding a second one, so it gets a fresh array of the
+    // new shape too (a no-op until a finding has been chosen).
+    describeImproveShape();
+    newImproveArray();
   }
 
   // Pulls one comparison at a time from the algorithm's generator, redraws,
@@ -170,8 +177,10 @@ export function initRace(root: ParentNode): void {
     raceButton!.disabled = true;
     statsButton!.disabled = true;
     // The shape is the experimental condition, so it is locked for the duration
-    // of the race. Only the speed slider stays live.
-    shapeSelect!.disabled = true;
+    // of the race. Only the speed slider stays live. Amendment 5: the lock is
+    // shared with the improvement race below, hence syncShapeLock rather than a
+    // straight assignment -- either race running keeps the selector disabled.
+    syncShapeLock();
     const totals = new Map<PanelId, number>();
 
     for (const panel of Object.values(panels)) {
@@ -200,7 +209,7 @@ export function initRace(root: ParentNode): void {
         shuffleButton!.disabled = false;
         raceButton!.disabled = false;
         statsButton!.disabled = false;
-        shapeSelect!.disabled = false;
+        syncShapeLock();
       });
     }
   }
@@ -290,6 +299,204 @@ export function initRace(root: ParentNode): void {
       }),
     );
   }
+
+  /*
+   * ------------------------------------------------------------------
+   * The improvement race (PLAN.md Amendment 5): four cards, one shared
+   * area, original against improved on the identical array.
+   * ------------------------------------------------------------------
+   */
+
+  function need<T extends HTMLElement>(selector: string): T {
+    const found = root.querySelector<T>(selector);
+    if (!found) throw new Error(`improvement race markup is missing ${selector}`);
+    return found;
+  }
+
+  const cardList = need('[data-testid="finding-cards"]');
+  const improveTitle = need('[data-testid="improve-title"]');
+  const improveFinding = need('[data-testid="improve-finding"]');
+  const improveChange = need('[data-testid="improve-change"]');
+  const improveExpect = need('[data-testid="improve-expect"]');
+  const improveShapeNote = need('[data-testid="improve-shape"]');
+  const improveShuffle = need<HTMLButtonElement>('[data-testid="improve-shuffle"]');
+  const improveRaceButton = need<HTMLButtonElement>('[data-testid="improve-race"]');
+  const improveSides = {
+    original: {
+      section: need('[data-testid="improve-panel-original"]'),
+      bars: need('[data-testid="improve-bars-original"]'),
+      counter: need('[data-testid="improve-counter-original"]'),
+      variant: need('[data-testid="improve-variant-original"]'),
+    },
+    improved: {
+      section: need('[data-testid="improve-panel-improved"]'),
+      bars: need('[data-testid="improve-bars-improved"]'),
+      counter: need('[data-testid="improve-counter-improved"]'),
+      variant: need('[data-testid="improve-variant-improved"]'),
+    },
+  };
+  const IMPROVE_SIDES = ["original", "improved"] as const;
+  type ImproveSide = (typeof IMPROVE_SIDES)[number];
+
+  // Which finding is loaded, or null before the reader picks one. The area's
+  // buttons stay disabled while it is null, so "choose a finding first" is a
+  // property of the page rather than an instruction that can be ignored.
+  let chosen: AlgorithmKey | null = null;
+  let improveArray: number[] = [];
+  let improveRacing = false;
+
+  // Both races share the one Starting data selector, so the lock has to account
+  // for both: whichever is still running keeps it disabled.
+  function syncShapeLock(): void {
+    shapeSelect!.disabled = racing || improveRacing;
+  }
+
+  function setImproveControls(): void {
+    const ready = chosen !== null && !improveRacing;
+    improveShuffle.disabled = !ready;
+    improveRaceButton.disabled = !ready;
+    for (const button of cardList.querySelectorAll("button")) {
+      button.disabled = improveRacing;
+    }
+  }
+
+  function newImproveArray(): void {
+    if (chosen === null || improveRacing) return;
+    improveArray = INPUT_SHAPES[currentShape()](ARRAY_LENGTH);
+    for (const side of IMPROVE_SIDES) {
+      renderBars(improveSides[side].bars, improveArray, ARRAY_LENGTH);
+      improveSides[side].counter.textContent = "0";
+      delete improveSides[side].section.dataset.sorted;
+      delete improveSides[side].section.dataset.winner;
+    }
+  }
+
+  // The condition, restated inside the area. The reader can change the shape with
+  // the selector far above, and a result whose input shape is off-screen is a
+  // number without its condition attached.
+  function describeImproveShape(): void {
+    improveShapeNote.textContent =
+      chosen === null
+        ? ""
+        : `Both sides start from the same ${SHAPE_LABELS[currentShape()].toLowerCase()} array.`;
+  }
+
+  function chooseFinding(algorithm: AlgorithmKey): void {
+    if (improveRacing) return;
+    chosen = algorithm;
+    const improvement = IMPROVEMENTS[algorithm];
+    // One area, reloaded. Choosing a second card must not leave two races on the
+    // page, which is why this writes into the same elements every time.
+    improveTitle.textContent = `${ALGORITHM_LABELS[algorithm]} — ${improvement.label}`;
+    improveFinding.textContent = improvement.finding;
+    // "Improved" has to say what was changed, or the reader is being asked to
+    // trust a label. This is the one sentence of mechanism.
+    improveChange.textContent = `What changed: ${improvement.change}`;
+    improveExpect.textContent = improvement.expect(ARRAY_LENGTH);
+    improveSides.original.variant.textContent = `(${ALGORITHM_VARIANTS[algorithm] || "ordinary version"})`;
+    improveSides.improved.variant.textContent = `(${improvement.label})`;
+    const area = need('[data-testid="improve-area"]');
+    area.dataset.algorithm = algorithm;
+    for (const button of cardList.querySelectorAll<HTMLButtonElement>("button")) {
+      const selected = button.dataset.algorithm === algorithm;
+      button.dataset.selected = String(selected);
+      button.setAttribute("aria-pressed", String(selected));
+    }
+    setImproveControls();
+    describeImproveShape();
+    newImproveArray();
+  }
+
+  // Deliberately not reusing runPanel: that one reads the main race's shared
+  // array and its algorithm map, and Amendment 5 keeps the main race untouched.
+  function runImproveSide(
+    side: ImproveSide,
+    generate: (input: number[]) => ReturnType<(typeof SORT_ALGORITHMS)[AlgorithmKey]>,
+    onDone: (comparisons: number) => void,
+  ): void {
+    const refs = improveSides[side];
+    const generator = generate([...improveArray]);
+
+    function step(): void {
+      const result = generator.next();
+      renderBars(refs.bars, result.value.array, ARRAY_LENGTH, result.value);
+      refs.counter.textContent = String(result.value.comparisons);
+      if (result.done) {
+        refs.section.dataset.sorted = "true";
+        onDone(result.value.comparisons);
+        return;
+      }
+      setTimeout(step, currentStepMs());
+    }
+    step();
+  }
+
+  function improveRace(): void {
+    if (chosen === null || improveRacing || improveArray.length === 0) return;
+    improveRacing = true;
+    setImproveControls();
+    syncShapeLock();
+    const algorithm = chosen;
+    const totals = new Map<ImproveSide, number>();
+
+    for (const side of IMPROVE_SIDES) {
+      delete improveSides[side].section.dataset.sorted;
+      delete improveSides[side].section.dataset.winner;
+    }
+
+    const generators: Record<ImproveSide, (input: number[]) => ReturnType<(typeof SORT_ALGORITHMS)[AlgorithmKey]>> = {
+      original: SORT_ALGORITHMS[algorithm],
+      improved: IMPROVED_ALGORITHMS[algorithm],
+    };
+
+    for (const side of IMPROVE_SIDES) {
+      runImproveSide(side, generators[side], (comparisons) => {
+        totals.set(side, comparisons);
+        if (totals.size < IMPROVE_SIDES.length) return;
+
+        // Fewest comparisons wins, the same definition as the main race. The
+        // improved side can lose one it usually wins -- quick sort's random
+        // pivot varies run to run -- and that is the honest display of an
+        // expected-case improvement, not a result to hide (Amendment 5).
+        const fewest = Math.min(...totals.values());
+        for (const [name, count] of totals) {
+          if (count === fewest) improveSides[name].section.dataset.winner = "true";
+        }
+
+        improveRacing = false;
+        setImproveControls();
+        syncShapeLock();
+      });
+    }
+  }
+
+  for (const algorithm of ALGORITHM_KEYS) {
+    const improvement = IMPROVEMENTS[algorithm];
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card";
+    button.dataset.testid = `finding-card-${algorithm}`;
+    button.dataset.algorithm = algorithm;
+    button.setAttribute("aria-pressed", "false");
+
+    const heading = document.createElement("strong");
+    heading.textContent = ALGORITHM_LABELS[algorithm];
+    const label = document.createElement("span");
+    label.className = "card-label";
+    label.textContent = improvement.label;
+    const finding = document.createElement("small");
+    finding.className = "card-finding";
+    finding.textContent = improvement.finding;
+
+    button.append(heading, label, finding);
+    button.addEventListener("click", () => chooseFinding(algorithm));
+    item.append(button);
+    cardList.append(item);
+  }
+
+  improveShuffle.addEventListener("click", newImproveArray);
+  improveRaceButton.addEventListener("click", improveRace);
 
   for (const id of PANEL_IDS) {
     const panel = panels[id];

@@ -41,7 +41,8 @@ a {
   cursor: not-allowed;
 }
 
-.controls button[data-testid="race-button"] {
+.controls button[data-testid="race-button"],
+.controls button[data-testid="improve-race"] {
   background: #1a1a1a;
   color: #fff;
 }
@@ -277,6 +278,143 @@ a {
   color: #666;
 }
 
+.findings {
+  margin-top: 2.5rem;
+  border-top: 1px solid #ddd;
+  padding-top: 1.5rem;
+}
+
+.findings h2 {
+  font-size: 1.1rem;
+}
+
+/* auto-fit + minmax: the cards lay themselves out at whatever width they have --
+   four across on desktop, one per row on a phone -- without a second breakpoint
+   deciding the count. The 13rem floor is what a finding sentence needs to stay
+   readable; below that the browser drops to fewer columns on its own. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole card is the button, so the click target is the card rather than a
+   link buried inside it. Targeted by class rather than by element: as a bare
+   `.cards button` this would be lower-specificity than the `.controls button`
+   rules above it, which is stylelint's no-descending-specificity error -- the
+   later rule would be the one that loses. */
+.cards .card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  padding: 0.75rem;
+  border: 2px solid #ddd;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cards .card strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.cards .card .card-label {
+  display: block;
+  color: #0b5fff;
+  font-weight: 600;
+}
+
+.cards .card .card-finding {
+  display: block;
+  margin-top: 0.35rem;
+  color: #555;
+}
+
+.cards .card:hover {
+  border-color: #999;
+}
+
+/* The chosen card and the area below it share the blue, so it is visible which
+   card the one race area is currently showing. */
+.cards .card[data-selected="true"] {
+  border-color: #0b5fff;
+  background: #f5f8ff;
+}
+
+.cards .card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.improve {
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  background: #fafafa;
+}
+
+.improve h3 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.improve .panel {
+  background: #fff;
+}
+
+.improve .panel h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.improve .panel h4 small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.improve .controls {
+  margin: 1rem 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.improve-finding {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.improve-change {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.improve-shape {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.improve-expect {
+  margin: 1.25rem 0 0;
+  border-left: 3px solid #ddd;
+  padding-left: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #555;
+}
+
 @media (width <= 640px) {
   body {
     padding: 1rem;
@@ -288,5 +426,15 @@ a {
 
   .controls {
     flex-wrap: wrap;
+  }
+
+  /* The area holds two stacked panels on a phone, so its own padding comes down
+     to keep the pair inside one scroll of the finding that opened it. */
+  .improve {
+    padding: 0.75rem;
+  }
+
+  .improve .bars {
+    height: 9rem;
   }
 }
