@@ -165,6 +165,21 @@ export const ALGORITHM_LABELS: Record<AlgorithmKey, string> = {
   quick: "Quick sort",
 };
 
+/**
+ * Which variant of each algorithm this page implements, where the choice
+ * changes the numbers. Bubble's fixed loops are why it reports the same 120
+ * comparisons on every input shape, and Quick's last-element pivot is why it
+ * gets *worse* on nearly-ordered data -- both are properties of these
+ * implementations, not of the algorithms, so the label travels with the number
+ * (PLAN.md Amendment 3). Empty string means "the ordinary textbook version".
+ */
+export const ALGORITHM_VARIANTS: Record<AlgorithmKey, string> = {
+  bubble: "basic fixed loops, no early exit",
+  insertion: "",
+  merge: "",
+  quick: "last-element pivot",
+};
+
 export interface AlgorithmStats {
   algorithm: AlgorithmKey;
   averageComparisons: number;
@@ -216,4 +231,87 @@ export function shuffledRange(length: number): number[] {
     [values[i], values[j]] = [values[j], values[i]];
   }
   return values;
+}
+
+export type ShapeKey = "random" | "nearlySorted" | "nearlyReversed";
+
+export const SHAPE_LABELS: Record<ShapeKey, string> = {
+  random: "Random",
+  nearlySorted: "Nearly sorted",
+  nearlyReversed: "Nearly reversed",
+};
+
+/** How the statistics run describes each shape in the table's scope line. */
+export const SHAPE_DESCRIPTIONS: Record<ShapeKey, string> = {
+  random: "random shuffles",
+  nearlySorted: "nearly-sorted arrays",
+  nearlyReversed: "nearly-reversed arrays",
+};
+
+/** How many values the two "nearly" shapes knock out of place. */
+const DISPLACEMENTS = 2;
+
+/**
+ * Takes a fully ordered array and pulls `moves` values out, dropping each back
+ * in at a random position. Two bases give the symmetric pair: ascending makes
+ * "nearly sorted", descending makes "nearly reversed" (PLAN.md Amendment 3).
+ *
+ * Measured against three alternatives before choosing it. Swapping *adjacent*
+ * pairs instead leaves the array looking identical to sorted, and lands back on
+ * exactly sorted 6% of the time; three random swaps drifts so close to random
+ * that insertion sort stops reliably winning. Displacing two values is visibly
+ * disordered without being random, and is describable in one sentence.
+ *
+ * The loop rejects a result that lands back on the untouched base, so a "nearly
+ * sorted" array is never actually sorted -- which would read as a bug.
+ */
+function displaced(base: number[], moves: number): number[] {
+  let values: number[];
+  do {
+    values = [...base];
+    for (let move = 0; move < moves; move++) {
+      const [value] = values.splice(Math.floor(Math.random() * values.length), 1);
+      values.splice(Math.floor(Math.random() * (values.length + 1)), 0, value);
+    }
+  } while (values.every((value, index) => value === base[index]));
+  return values;
+}
+
+/**
+ * The three starting conditions. One shape is selected on the page and drives
+ * both the race and the statistics run, so the two always describe the same
+ * experiment.
+ */
+export const INPUT_SHAPES: Record<ShapeKey, (length: number) => number[]> = {
+  random: (length) => shuffledRange(length),
+  nearlySorted: (length) =>
+    displaced(
+      Array.from({ length }, (_, i) => i + 1),
+      DISPLACEMENTS,
+    ),
+  nearlyReversed: (length) =>
+    displaced(
+      Array.from({ length }, (_, i) => length - i),
+      DISPLACEMENTS,
+    ),
+};
+
+/**
+ * A sample of distinct arrays of one shape, for the statistics run. Distinct
+ * because an unguarded 20-draw of a "nearly" shape repeats itself about 3% of
+ * the time, and the table promises 20 different inputs. There are 22066 arrays
+ * reachable by two displacements, so rejecting duplicates costs about 0.04
+ * extra draws per sample and cannot exhaust the space.
+ */
+export function shapeSample(shape: ShapeKey, length: number, count: number): number[][] {
+  const seen = new Set<string>();
+  const inputs: number[][] = [];
+  while (inputs.length < count) {
+    const candidate = INPUT_SHAPES[shape](length);
+    const key = candidate.join(",");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    inputs.push(candidate);
+  }
+  return inputs;
 }

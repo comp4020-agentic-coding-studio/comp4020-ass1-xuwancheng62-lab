@@ -46,6 +46,18 @@ a {
   color: #fff;
 }
 
+.shape {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.shape select {
+  font-size: 1rem;
+  padding: 0.25rem;
+}
+
 /* The slider stays enabled while the buttons are disabled mid-race, because
    changing the speed of a running race is the point of it. */
 .speed {
@@ -162,6 +174,15 @@ a {
   background: #7c3aed;
 }
 
+.variants {
+  margin: 0 0 1.5rem;
+  border-left: 3px solid #ddd;
+  padding-left: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #555;
+}
+
 .status {
   margin: 0.75rem 0 0;
   font-size: 0.95rem;
@@ -208,6 +229,15 @@ a {
 .stats tbody tr[data-fewest="true"] {
   font-weight: 600;
   color: #0b5fff;
+}
+
+/* The variant note sits under the algorithm name in the same cell, so the
+   qualifier is impossible to read separately from the number it qualifies. */
+.stats tbody th small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: #666;
 }
 
 @media (width <= 640px) {

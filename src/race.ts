@@ -1,9 +1,14 @@
 import {
   ALGORITHM_LABELS,
+  ALGORITHM_VARIANTS,
+  INPUT_SHAPES,
+  SHAPE_DESCRIPTIONS,
+  SHAPE_LABELS,
   SORT_ALGORITHMS,
   comparisonStats,
-  shuffledRange,
+  shapeSample,
   type AlgorithmKey,
+  type ShapeKey,
   type SortStep,
 } from "./sorting";
 
@@ -66,9 +71,11 @@ export function initRace(root: ParentNode): void {
   const shuffleButton = root.querySelector<HTMLButtonElement>('[data-testid="shuffle-button"]');
   const raceButton = root.querySelector<HTMLButtonElement>('[data-testid="race-button"]');
   const speedSlider = root.querySelector<HTMLInputElement>('[data-testid="speed-slider"]');
+  const shapeSelect = root.querySelector<HTMLSelectElement>('[data-testid="shape-select"]');
   const statsButton = root.querySelector<HTMLButtonElement>('[data-testid="stats-button"]');
   const statsBody = root.querySelector<HTMLElement>('[data-testid="stats-body"]');
-  if (!shuffleButton || !raceButton || !speedSlider || !statsButton || !statsBody) {
+  const statsScope = root.querySelector<HTMLElement>('[data-testid="stats-scope"]');
+  if (!shuffleButton || !raceButton || !speedSlider || !shapeSelect || !statsButton || !statsBody || !statsScope) {
     throw new Error("race controls are missing required markup");
   }
 
@@ -83,15 +90,38 @@ export function initRace(root: ParentNode): void {
     return Number.isFinite(rate) && rate > 0 ? 1000 / rate : DEFAULT_STEP_MS;
   }
 
-  function shuffle(): void {
+  function currentShape(): ShapeKey {
+    return shapeSelect!.value as ShapeKey;
+  }
+
+  // One array per press, handed to both panels, so the two algorithms are
+  // always compared on identical data -- the shape select only changes which
+  // kind of array gets made here.
+  function newStart(): void {
     if (racing) return;
-    sharedArray = shuffledRange(ARRAY_LENGTH);
+    sharedArray = INPUT_SHAPES[currentShape()](ARRAY_LENGTH);
     for (const panel of Object.values(panels)) {
       renderBars(panel.bars, sharedArray, ARRAY_LENGTH);
       panel.counter.textContent = "0";
       delete panel.section.dataset.sorted;
       delete panel.section.dataset.winner;
     }
+  }
+
+  function describeStatsScope(): void {
+    statsScope!.textContent =
+      `Comparisons made on ${STATS_RUNS} different ${SHAPE_DESCRIPTIONS[currentShape()]} of ` +
+      `${ARRAY_LENGTH} items.`;
+  }
+
+  // Changing the condition invalidates any statistics on screen: numbers from
+  // one shape sitting under a caption naming another is the exact kind of
+  // false claim this control exists to expose.
+  function changeShape(): void {
+    if (racing) return;
+    statsBody!.replaceChildren();
+    describeStatsScope();
+    newStart();
   }
 
   // Pulls one comparison at a time from the algorithm's generator, redraws,
@@ -120,6 +150,9 @@ export function initRace(root: ParentNode): void {
     shuffleButton!.disabled = true;
     raceButton!.disabled = true;
     statsButton!.disabled = true;
+    // The shape is the experimental condition, so it is locked for the duration
+    // of the race. Only the speed slider stays live.
+    shapeSelect!.disabled = true;
     const totals = new Map<PanelId, number>();
 
     for (const panel of Object.values(panels)) {
@@ -148,13 +181,17 @@ export function initRace(root: ParentNode): void {
         shuffleButton!.disabled = false;
         raceButton!.disabled = false;
         statsButton!.disabled = false;
+        shapeSelect!.disabled = false;
       });
     }
   }
 
   function runStats(): void {
-    const inputs = Array.from({ length: STATS_RUNS }, () => shuffledRange(ARRAY_LENGTH));
+    const inputs = shapeSample(currentShape(), ARRAY_LENGTH, STATS_RUNS);
+    // comparisonStats takes the inputs and loops the algorithms inside, so all
+    // four are scored on this same set of arrays rather than on their own draws.
     const rows = comparisonStats(inputs);
+    describeStatsScope();
     const fewest = Math.min(...rows.map((row) => row.averageComparisons));
 
     statsBody!.replaceChildren(
@@ -166,6 +203,15 @@ export function initRace(root: ParentNode): void {
         const name = document.createElement("th");
         name.scope = "row";
         name.textContent = ALGORITHM_LABELS[row.algorithm];
+        // Where the number depends on which variant we implemented, the variant
+        // is named right here in the row rather than in a footnote, so nobody
+        // reads Bubble's flat 120 as a fact about bubble sort in general.
+        const variant = ALGORITHM_VARIANTS[row.algorithm];
+        if (variant) {
+          const note = document.createElement("small");
+          note.textContent = variant;
+          name.append(note);
+        }
 
         const average = document.createElement("td");
         average.dataset.testid = `stats-average-${row.algorithm}`;
@@ -192,10 +238,20 @@ export function initRace(root: ParentNode): void {
   panels.a.select.value = "bubble";
   panels.b.select.value = "quick";
 
-  shuffleButton.addEventListener("click", shuffle);
+  for (const [value, label] of Object.entries(SHAPE_LABELS)) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    shapeSelect.append(option);
+  }
+  shapeSelect.value = "random";
+
+  shuffleButton.addEventListener("click", newStart);
   raceButton.addEventListener("click", race);
   // No listener for the slider: currentStepMs() reads it when scheduling the
   // next frame, so a mid-race drag is picked up by the next step on its own.
+  shapeSelect.addEventListener("change", changeShape);
   statsButton.addEventListener("click", runStats);
-  shuffle();
+  describeStatsScope();
+  newStart();
 }

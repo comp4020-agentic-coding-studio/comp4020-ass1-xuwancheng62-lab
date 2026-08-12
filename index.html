@@ -17,13 +17,18 @@
       <p>
         Bubble, insertion, merge and quick sort all solve the same problem: put
         these bars in order, shortest to tallest. Pick one for each side, press
-        <strong>Race</strong>, and watch how differently they get there —
-        same bars, same shuffle, wildly different amounts of work.
+        <strong>Race</strong>, and watch how differently they get there — same
+        bars, same starting array, wildly different amounts of work. Then change
+        the starting data, and watch the winner change with it.
       </p>
 
       <div class="controls">
-        <button type="button" data-testid="shuffle-button">New shuffle</button>
+        <button type="button" data-testid="shuffle-button">New start</button>
         <button type="button" data-testid="race-button">Race</button>
+        <span class="shape">
+          <label for="shape-select">Starting data</label>
+          <select id="shape-select" data-testid="shape-select"></select>
+        </span>
         <span class="speed">
           <label for="speed-slider">Speed</label>
           <span aria-hidden="true">Slow</span>
@@ -42,6 +47,18 @@
       <p class="legend">
         <span data-role="compared">comparing now</span>
         <span data-role="pivot">pivot (quick sort)</span>
+      </p>
+
+      <p class="variants">
+        Which versions these are matters, because it changes the numbers below.
+        <strong>Bubble sort</strong> here is the basic fixed-loop version with no
+        early exit, so it makes the same 120 comparisons whatever the starting
+        data — a bubble sort that stops early when a pass finds nothing to swap
+        would be one of the fastest here on nearly-sorted input, not the slowest.
+        <strong>Quick sort</strong> here always takes the last value as its
+        pivot, which is why it does <em>more</em> work on nearly-ordered data;
+        picking the pivot at random, or as the median of three, avoids that.
+        Insertion and merge sort are the ordinary versions.
       </p>
 
       <div class="panels">
@@ -71,20 +88,25 @@
       </div>
 
       <section class="stats">
-        <h2>Compare all four over many shuffles</h2>
+        <h2>Compare all four over many arrays</h2>
         <p>
-          One race is one shuffle, and a lucky shuffle can flatter an algorithm.
-          This runs all four over the same 20 random arrays and counts their
-          comparisons.
+          One race is one array, and a lucky array can flatter an algorithm. This
+          runs all four over the same 20 arrays of whichever starting data is
+          selected above, and counts their comparisons. Change the starting data
+          and run it again to see the ranking rearrange.
         </p>
-        <button type="button" data-testid="stats-button">Run 20 shuffles</button>
+        <button type="button" data-testid="stats-button">Run 20 arrays</button>
         <table>
           <caption>
-            Comparisons made on 20 random shuffles of 16 items. This counts
-            comparisons only — it is not a measure of wall-clock speed or
-            memory, and it says nothing about larger arrays or
-            already-partly-sorted ones. A run counts for every algorithm tied
-            for fewest, so the last column can add up to more than 20.
+            <span data-testid="stats-scope"
+              >Comparisons made on 20 different random shuffles of 16
+              items.</span
+            >
+            This counts comparisons only — it is not a measure of wall-clock
+            speed or memory, and it says nothing about larger arrays or about
+            input shapes other than the one selected. A run counts for every
+            algorithm tied for fewest, so the last column can add up to more
+            than 20.
           </caption>
           <thead>
             <tr>
