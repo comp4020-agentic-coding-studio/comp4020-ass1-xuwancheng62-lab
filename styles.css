@@ -26,7 +26,8 @@ a {
    no-descending-specificity rule wants the plain selectors ahead of the
    :disabled ones, and duplicating them would put .stats button after. */
 .controls button,
-.stats button {
+.stats button,
+.improve .rerun {
   font-size: 1rem;
   padding: 0.5rem 1.25rem;
   border: 1px solid #1a1a1a;
@@ -35,8 +36,21 @@ a {
   cursor: pointer;
 }
 
+/* Smaller than the race buttons: rerunning the comparison is a secondary action
+   next to the race itself. Targeted by class, not as `.improve button` -- as a
+   bare element selector it would share its last compound with the
+   `button:disabled` rule below and be overridden by it, which is what
+   stylelint's no-descending-specificity catches. It also has to sit above that
+   rule for the same reason. */
+.improve .rerun {
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+  padding: 0.4rem 1rem;
+}
+
 .controls button:disabled,
-.stats button:disabled {
+.stats button:disabled,
+.improve .rerun:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -211,7 +225,11 @@ a {
   font-size: 1.1rem;
 }
 
-.stats table {
+/* The improvement comparison is the same kind of object as the statistics matrix
+   -- a table of measured averages -- so it shares its table, caption and cell
+   rules rather than growing a parallel set that could drift. */
+.stats table,
+.improve table {
   width: 100%;
   margin-top: 1.5rem;
   border-collapse: collapse;
@@ -220,7 +238,8 @@ a {
 
 /* caption-side: bottom reads as a footnote to the numbers rather than a
    heading above them, which is what this qualifying text is. */
-.stats caption {
+.stats caption,
+.improve caption {
   caption-side: bottom;
   margin-top: 0.75rem;
   font-size: 0.8rem;
@@ -230,7 +249,9 @@ a {
 }
 
 .stats th,
-.stats td {
+.stats td,
+.improve th,
+.improve td {
   border-bottom: 1px solid #eee;
   padding: 0.4rem 0.5rem;
 }
@@ -404,6 +425,36 @@ a {
 .improve-shape {
   font-size: 0.8rem;
   color: #555;
+}
+
+.improve-matrix {
+  font-size: 0.9rem;
+}
+
+/* Three equal number columns, the shape name taking what's left -- the same
+   division the statistics matrix uses, so the two tables scan alike. */
+.improve-matrix thead th:not(:first-child),
+.improve-matrix tbody td {
+  width: 22%;
+}
+
+/* "19 / 1 / 0" on one line: broken across two it stops reading as one triple. */
+.improve-matrix tbody td:last-child {
+  white-space: nowrap;
+}
+
+/* Tints the row by what its own two averages say -- green where the improvement
+   helped, red where it cost comparisons, plain where both round to the same
+   number. An attribute selector: race.ts sets data-direction on the row from the
+   numbers it just printed, so the tint cannot disagree with the row. The counts
+   in the row carry the finding on their own; this only makes the pattern across
+   the three shapes visible without reading them. */
+.improve-matrix tbody tr[data-direction="better"] {
+  background: #f0fdf4;
+}
+
+.improve-matrix tbody tr[data-direction="worse"] {
+  background: #fef2f2;
 }
 
 .improve-expect {

@@ -926,6 +926,28 @@ comes from the existing selector. Per the frozen-plan rule I am not editing that
 decision; this amendment overrides it in the open, and if reading (2) was what
 you meant, the answer is that it already works and nothing needs building.
 
+### Approved with corrections (13 August 2026)
+
+Approved for implementation, with corrections made by me on review. Recorded here
+rather than by editing the proposals above, so the plan still shows what was
+proposed and what I changed:
+
+1. **Show wins / ties / losses, all three, as numbers.** This replaces the
+   "wins with a tie count underneath" proposal in "Ties: the third column cannot
+   be only wins". Three explicit counts per shape, so Bubble's nearly-reversed row
+   states `0 / 20 / 0` outright instead of relying on small print to stop `0` from
+   reading as a failure.
+2. **A local speed slider for the improvement race** — reading (1) of the open
+   question. Supersedes Amendment 5 decision 3 for speed only; the shape still
+   comes from the existing Starting data selector.
+3. **Each improvement compares against its own original only**, never against
+   another algorithm. Already true of the design; stated here so it is a fixed
+   contract rather than an accident of the current code.
+4. **Keep the page concise — no long explanatory text.** The interaction and the
+   numbers are the evidence. So: no new prose paragraphs anywhere in this
+   iteration, a caption of at most two short sentences, and nothing added that
+   restates in words what the table already shows.
+
 ### Decisions, locked (pending approval)
 
 1. **The animated race is unchanged.** Nothing about the panels, the single

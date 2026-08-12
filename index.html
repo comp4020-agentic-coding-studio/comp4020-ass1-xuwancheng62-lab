@@ -155,6 +155,19 @@
             <button type="button" data-testid="improve-race" disabled>
               Race
             </button>
+            <span class="speed">
+              <label for="improve-speed">Speed</label>
+              <span aria-hidden="true">Slow</span>
+              <input
+                id="improve-speed"
+                type="range"
+                min="2"
+                max="50"
+                value="10"
+                data-testid="improve-speed"
+              />
+              <span aria-hidden="true">Fast</span>
+            </span>
             <span class="improve-shape" data-testid="improve-shape"></span>
           </div>
           <div class="panels">
@@ -176,6 +189,18 @@
             </section>
           </div>
           <p class="improve-expect" data-testid="improve-expect"></p>
+
+          <button type="button" class="rerun" data-testid="improve-rerun" disabled>
+            Run 20 more arrays
+          </button>
+          <table class="improve-matrix" data-testid="improve-stats">
+            <caption>
+              <span data-testid="improve-stats-scope"></span>
+              Won / tied / lost counts arrays, not comparisons.
+            </caption>
+            <thead data-testid="improve-stats-head"></thead>
+            <tbody data-testid="improve-stats-body"></tbody>
+          </table>
         </section>
       </section>
     </main>

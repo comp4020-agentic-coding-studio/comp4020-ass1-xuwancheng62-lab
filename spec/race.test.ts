@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { initRace } from "../src/race";
 import {
+  ALGORITHM_VARIANTS,
   IMPROVED_ALGORITHMS,
   IMPROVEMENTS,
   INPUT_SHAPES,
@@ -12,6 +13,7 @@ import {
   comparisonStats,
   countComparisons,
   countVariantComparisons,
+  improvementComparison,
   shapeSample,
   shuffledRange,
   type AlgorithmKey,
@@ -67,6 +69,13 @@ const IMPROVE_MARKUP = `
       <output data-testid="improve-counter-improved">0</output>
     </section>
     <p data-testid="improve-expect"></p>
+    <input type="range" min="2" max="50" value="10" data-testid="improve-speed" />
+    <button type="button" class="rerun" data-testid="improve-rerun" disabled></button>
+    <table data-testid="improve-stats">
+      <caption><span data-testid="improve-stats-scope"></span></caption>
+      <thead data-testid="improve-stats-head"></thead>
+      <tbody data-testid="improve-stats-body"></tbody>
+    </table>
   </section>
 `;
 
@@ -783,6 +792,115 @@ describe("what the improvement race claims", () => {
   });
 });
 
+/*
+ * The 20-run comparison (PLAN.md Amendment 6). The direction of each
+ * improvement is already asserted above at 200 samples; what this block asserts
+ * is what the *20-array* block on the page promises, in counts rather than
+ * averages, because counts out of 20 are what the reader is shown.
+ *
+ * Bounds measured before being written, over 20,000 samples of 20 arrays each
+ * (won / tied / lost, out of 20, min..max observed):
+ *   bubble    random          16..20 won,  0..11 tied,  0 lost
+ *   bubble    nearlySorted    16..20 won,  0..4  tied,  0 lost
+ *   bubble    nearlyReversed   0..5  won, 15..20 tied,  0 lost
+ *   insertion random          18..20 won,  0..2  tied,  0..2 lost
+ *   insertion nearlySorted     0..1  won,  0..2  tied, 18..20 lost
+ *   insertion nearlyReversed  20..20 won,  0     tied,  0 lost
+ *   merge     random           0..1  won,  0..1  tied, 19..20 lost
+ *   merge     nearlySorted     9..20 won,  0..7  tied,  0..9 lost
+ *   merge     nearlyReversed   0     won,  0     tied, 20..20 lost
+ *   quick     random           2..18 won,  0..6  tied,  2..18 lost
+ *   quick     nearlySorted    16..20 won,  0..2  tied,  0..4 lost
+ *   quick     nearlyReversed  15..20 won,  0..3  tied,  0..4 lost
+ * Every assertion below sits well inside its worst observed trial. Quick sort on
+ * random input is deliberately not given a direction: 2..18 IS the finding, and
+ * a test claiming otherwise would be a flake waiting to happen.
+ */
+describe("the 20-run comparison", () => {
+  const RUNS = 20;
+
+  it("accounts for every array as a win, a tie or a loss", () => {
+    for (const key of ALGORITHM_KEYS) {
+      for (const shape of SHAPE_KEYS) {
+        const result = improvementComparison(key, shapeSample(shape, 16, RUNS));
+        expect(
+          result.improvedWins + result.ties + result.improvedLosses,
+          `${key}/${shape}: ${result.improvedWins}/${result.ties}/${result.improvedLosses} does not add to ${RUNS}`,
+        ).toBe(RUNS);
+      }
+    }
+  });
+
+  // Fairness, asserted rather than promised in the caption: both averages must
+  // equal what the same arrays produce when counted independently, which they
+  // can only do if both variants were given those same arrays.
+  it("measures both variants on the identical arrays", () => {
+    for (const key of ALGORITHM_KEYS) {
+      const inputs = shapeSample("random", 16, RUNS);
+      const result = improvementComparison(key, inputs);
+      const mean = (sort: (input: number[]) => ReturnType<(typeof SORT_ALGORITHMS)[AlgorithmKey]>) =>
+        inputs.reduce((total, input) => total + countVariantComparisons(sort, input), 0) / inputs.length;
+
+      expect(result.originalAverage, `${key}: original average is not the mean over those arrays`).toBe(
+        mean(SORT_ALGORITHMS[key]),
+      );
+      // Quick sort's improved side is random, so its average is re-measured here
+      // rather than compared: the check is that it lands in the same range, not
+      // that a random algorithm repeats itself.
+      if (key === "quick") {
+        expect(result.improvedAverage).toBeGreaterThan(0);
+      } else {
+        expect(result.improvedAverage, `${key}: improved average is not the mean over those arrays`).toBe(
+          mean(IMPROVED_ALGORITHMS[key]),
+        );
+      }
+    }
+  });
+
+  it("reports zeros for an empty sample rather than dividing by nothing", () => {
+    expect(improvementComparison("bubble", [])).toEqual({
+      originalAverage: 0,
+      improvedAverage: 0,
+      improvedWins: 0,
+      ties: 0,
+      improvedLosses: 0,
+    });
+  });
+
+  // The section's whole argument, in counts: the same change wins on one shape
+  // and loses on another. If this ever passes trivially -- all three shapes
+  // agreeing -- the page has stopped making the point it exists to make.
+  const counts: { key: AlgorithmKey; shape: ShapeKey; field: "improvedWins" | "ties" | "improvedLosses"; least: number }[] = [
+    { key: "bubble", shape: "nearlySorted", field: "improvedWins", least: 12 },
+    { key: "bubble", shape: "nearlyReversed", field: "ties", least: 10 },
+    { key: "insertion", shape: "random", field: "improvedWins", least: 15 },
+    { key: "insertion", shape: "nearlySorted", field: "improvedLosses", least: 15 },
+    { key: "insertion", shape: "nearlyReversed", field: "improvedWins", least: 18 },
+    { key: "merge", shape: "random", field: "improvedLosses", least: 15 },
+    { key: "merge", shape: "nearlySorted", field: "improvedWins", least: 5 },
+    { key: "merge", shape: "nearlyReversed", field: "improvedLosses", least: 18 },
+    { key: "quick", shape: "nearlySorted", field: "improvedWins", least: 12 },
+    { key: "quick", shape: "nearlyReversed", field: "improvedWins", least: 12 },
+  ];
+
+  for (const { key, shape, field, least } of counts) {
+    it(`${key} on ${shape} input: at least ${least} of ${RUNS} arrays ${field}`, () => {
+      const result = improvementComparison(key, shapeSample(shape, 16, RUNS));
+      expect(
+        result[field],
+        `${key}/${shape}: ${result.improvedWins} won, ${result.ties} tied, ${result.improvedLosses} lost`,
+      ).toBeGreaterThanOrEqual(least);
+    });
+  }
+
+  it("never records a loss for bubble sort's early exit, on any shape", () => {
+    for (const shape of SHAPE_KEYS) {
+      const result = improvementComparison("bubble", shapeSample(shape, 16, RUNS));
+      expect(result.improvedLosses, `early exit lost on ${shape} input`).toBe(0);
+    }
+  });
+});
+
 describe("the improvement race", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -991,6 +1109,161 @@ describe("the improvement race", () => {
     vi.runAllTimers();
     expect(shapeSelect.disabled, "selector stayed locked after the race").toBe(false);
   });
+
+  /*
+   * The comparison block below the animated race (PLAN.md Amendment 6).
+   */
+
+  // Reads the rendered table back as data, so these assert what a reader sees
+  // rather than what the module returned.
+  const readTable = (document: Document) =>
+    [...document.querySelectorAll('[data-testid="improve-stats-body"] tr')].map((row) => ({
+      shape: (row as HTMLElement).dataset.shape,
+      direction: (row as HTMLElement).dataset.direction,
+      cells: [...row.querySelectorAll("td")].map((cell) => cell.textContent!),
+    }));
+
+  it("shows all three shapes as soon as a card is chosen, with no press", () => {
+    const { document, click } = setup();
+    expect(readTable(document).length, "the comparison was populated before any card").toBe(0);
+
+    click("finding-card-insertion");
+    const rows = readTable(document);
+    expect(rows.map((row) => row.shape), "not one row per shape, in shape order").toEqual(SHAPE_KEYS);
+
+    for (const row of rows) {
+      const [original, improved, record] = row.cells;
+      expect(Number(original), `${row.shape}: original average is not a number`).toBeGreaterThan(0);
+      expect(Number(improved), `${row.shape}: improved average is not a number`).toBeGreaterThan(0);
+
+      // "won / tied / lost", and the three have to account for all 20 arrays --
+      // the correction that made ties their own number rather than small print.
+      const parts = record.split("/").map((part) => Number(part.trim()));
+      expect(parts.length, `${row.shape}: "${record}" is not three counts`).toBe(3);
+      expect(parts.reduce((a, b) => a + b, 0), `${row.shape}: "${record}" does not add to 20`).toBe(20);
+
+      // The tint is derived from the two numbers printed in the row, so it can
+      // never disagree with them.
+      const expected =
+        original === improved ? "same" : Number(improved) < Number(original) ? "better" : "worse";
+      expect(row.direction, `${row.shape}: tint says ${row.direction} for ${original} vs ${improved}`).toBe(
+        expected,
+      );
+    }
+  });
+
+  it("rebuilds the comparison for the card just chosen, naming both variants", () => {
+    const { document, click } = setup();
+    const table = document.querySelector('[data-testid="improve-stats"]') as HTMLElement;
+
+    for (const key of ALGORITHM_KEYS) {
+      click(`finding-card-${key}`);
+      expect(table.dataset.algorithm, `the comparison still belongs to another card`).toBe(key);
+      expect(readTable(document).length, `${key}: lost a shape row`).toBe(SHAPE_KEYS.length);
+
+      // A true number can still make a false claim: which variant produced each
+      // column travels with the numbers, not in a footnote elsewhere.
+      const scope = document.querySelector('[data-testid="improve-stats-scope"]')!.textContent!;
+      expect(scope, `${key}: the comparison does not say which improvement it ran`).toContain(
+        IMPROVEMENTS[key].label,
+      );
+      expect(scope, `${key}: the comparison does not say which original it ran`).toContain(
+        ALGORITHM_VARIANTS[key] || "ordinary version",
+      );
+    }
+  });
+
+  it("offers a rerun only once a card is chosen, and keeps the table whole", () => {
+    const { document, click } = setup();
+    const rerun = document.querySelector('[data-testid="improve-rerun"]') as HTMLButtonElement;
+    expect(rerun.disabled, "rerun was live before a card was chosen").toBe(true);
+
+    click("finding-card-quick");
+    expect(rerun.disabled, "rerun stayed disabled after choosing").toBe(false);
+
+    for (let press = 0; press < 3; press++) {
+      click("improve-rerun");
+      const rows = readTable(document);
+      expect(rows.map((row) => row.shape), `press ${press}: the table changed shape`).toEqual(SHAPE_KEYS);
+      for (const row of rows) {
+        const parts = row.cells[2].split("/").map((part) => Number(part.trim()));
+        expect(parts.reduce((a, b) => a + b, 0), `press ${press}: ${row.shape} lost an array`).toBe(20);
+      }
+    }
+  });
+
+  // Amendment 6 keeps Amendment 4's rule: a control that appears to change a
+  // table showing every value of the thing it controls is a lie about the table.
+  it("leaves the comparison alone when the starting shape changes", () => {
+    const { dom, document, click } = setup();
+    click("finding-card-bubble");
+    const before = JSON.stringify(readTable(document));
+
+    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    shapeSelect.value = "nearlyReversed";
+    shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+
+    expect(JSON.stringify(readTable(document)), "the selector redrew the comparison").toBe(before);
+  });
+
+  it("still animates a race after the comparison has run", () => {
+    const { document, click, counter } = setup();
+    click("finding-card-merge");
+    click("improve-rerun");
+
+    click("improve-race");
+    vi.runAllTimers();
+    for (const side of ["original", "improved"]) {
+      const panel = document.querySelector(`[data-testid="improve-panel-${side}"]`) as HTMLElement;
+      expect(panel.dataset.sorted, `${side} did not finish after a comparison run`).toBe("true");
+      expect(counter(side), `${side} counted nothing after a comparison run`).toBeGreaterThan(0);
+    }
+  });
+
+  // The local slider is the point of Amendment 6's speed change: it has to be the
+  // one this race obeys, not the main race's slider far above it.
+  it("takes its speed from its own slider, not the main one", () => {
+    const { document, click, counter } = setup();
+    const main = document.querySelector('[data-testid="speed-slider"]') as HTMLInputElement;
+    const local = document.querySelector('[data-testid="improve-speed"]') as HTMLInputElement;
+
+    // Bubble sort counts a comparison on every frame, so its counter measures how
+    // many steps were scheduled in the time advanced.
+    click("finding-card-bubble");
+    main.value = "50";
+    local.value = "2";
+    click("improve-race");
+    vi.advanceTimersByTime(1000);
+    const slow = counter("original");
+    vi.runAllTimers();
+
+    click("finding-card-bubble");
+    main.value = "2";
+    local.value = "50";
+    click("improve-race");
+    vi.advanceTimersByTime(1000);
+    const fast = counter("original");
+    vi.runAllTimers();
+
+    expect(fast, `local slider ignored: ${slow} comparisons slow, ${fast} fast`).toBeGreaterThan(slow);
+  });
+
+  it("keeps running when its own slider moves mid-race", () => {
+    const { document, click, counter } = setup();
+    click("finding-card-insertion");
+    click("improve-race");
+    vi.advanceTimersByTime(200);
+
+    const local = document.querySelector('[data-testid="improve-speed"]') as HTMLInputElement;
+    local.value = "50";
+    vi.runAllTimers();
+
+    for (const side of ["original", "improved"]) {
+      const panel = document.querySelector(`[data-testid="improve-panel-${side}"]`) as HTMLElement;
+      expect(panel.dataset.sorted, `${side} stalled when the speed changed`).toBe("true");
+      expect(counter(side), `${side} counted nothing`).toBeGreaterThan(0);
+    }
+  });
 });
 
 // The tests above run against a fixture. This one runs against the file that
@@ -1010,6 +1283,24 @@ describe("the shipped index.html", () => {
       ALGORITHM_KEYS.length,
     );
     expect(document.querySelectorAll('[data-testid^="improve-bars-"]').length).toBe(2);
+
+    // One comparison table and one rerun button, for the same reason as one
+    // improvement area: two of either and a reader cannot tell which card's
+    // numbers they are reading.
+    expect(document.querySelectorAll('[data-testid="improve-stats"]').length).toBe(1);
+    expect(document.querySelectorAll('[data-testid="improve-rerun"]').length).toBe(1);
+
+    // Two sliders, one per race. The improvement race got its own rather than
+    // borrowing the main one (Amendment 6), so the count is the contract.
+    expect(document.querySelectorAll('[data-testid="improve-speed"]').length).toBe(1);
+    expect(document.querySelectorAll('input[type="range"]').length).toBe(2);
+    for (const input of document.querySelectorAll('input[type="range"]')) {
+      const id = input.getAttribute("id")!;
+      expect(
+        document.querySelector(`label[for="${id}"]`),
+        `the ${id} slider has no label pointing at it`,
+      ).toBeTruthy();
+    }
   });
 
   // The findings section is what the statistics paragraph now points at.

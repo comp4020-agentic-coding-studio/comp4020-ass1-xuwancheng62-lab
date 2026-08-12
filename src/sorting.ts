@@ -485,6 +485,58 @@ export function comparisonStats(inputs: number[][]): AlgorithmStats[] {
   }));
 }
 
+export interface ImprovementComparison {
+  originalAverage: number;
+  improvedAverage: number;
+  /** Arrays where the improved variant used strictly fewer comparisons. */
+  improvedWins: number;
+  /** Arrays where the two used exactly the same number. Neither side's. */
+  ties: number;
+  improvedLosses: number;
+}
+
+/**
+ * One improvement measured against its own original over a set of arrays
+ * (PLAN.md Amendment 6). Never against another algorithm: the pair is fixed by
+ * the key, so a card cannot end up comparing bubble's fix to quick sort.
+ *
+ * Takes the inputs rather than generating them, for the same two reasons
+ * comparisonStats does: it is deterministic under test, and both variants
+ * provably see the identical arrays -- there is one `input` here and both counts
+ * read it, so fairness is a property of the loop rather than a promise in a
+ * caption. Both generators copy their input before touching it, so neither can
+ * hand the other a modified array.
+ */
+export function improvementComparison(
+  algorithm: AlgorithmKey,
+  inputs: number[][],
+): ImprovementComparison {
+  let originalTotal = 0;
+  let improvedTotal = 0;
+  let improvedWins = 0;
+  let ties = 0;
+  let improvedLosses = 0;
+
+  for (const input of inputs) {
+    const original = countVariantComparisons(SORT_ALGORITHMS[algorithm], input);
+    const improved = countVariantComparisons(IMPROVED_ALGORITHMS[algorithm], input);
+    originalTotal += original;
+    improvedTotal += improved;
+    if (improved < original) improvedWins++;
+    else if (improved === original) ties++;
+    else improvedLosses++;
+  }
+
+  const runs = inputs.length;
+  return {
+    originalAverage: runs === 0 ? 0 : originalTotal / runs,
+    improvedAverage: runs === 0 ? 0 : improvedTotal / runs,
+    improvedWins,
+    ties,
+    improvedLosses,
+  };
+}
+
 export function shuffledRange(length: number): number[] {
   const values = Array.from({ length }, (_, i) => i + 1);
   for (let i = values.length - 1; i > 0; i--) {

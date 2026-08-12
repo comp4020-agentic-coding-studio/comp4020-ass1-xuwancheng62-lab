@@ -8,6 +8,7 @@ import {
   SHAPE_LABELS,
   SORT_ALGORITHMS,
   comparisonStats,
+  improvementComparison,
   shapeSample,
   type AlgorithmKey,
   type ShapeKey,
@@ -321,6 +322,12 @@ export function initRace(root: ParentNode): void {
   const improveShapeNote = need('[data-testid="improve-shape"]');
   const improveShuffle = need<HTMLButtonElement>('[data-testid="improve-shuffle"]');
   const improveRaceButton = need<HTMLButtonElement>('[data-testid="improve-race"]');
+  const improveSpeed = need<HTMLInputElement>('[data-testid="improve-speed"]');
+  const improveRerun = need<HTMLButtonElement>('[data-testid="improve-rerun"]');
+  const improveStats = need('[data-testid="improve-stats"]');
+  const improveStatsHead = need('[data-testid="improve-stats-head"]');
+  const improveStatsBody = need('[data-testid="improve-stats-body"]');
+  const improveStatsScope = need('[data-testid="improve-stats-scope"]');
   const improveSides = {
     original: {
       section: need('[data-testid="improve-panel-original"]'),
@@ -351,13 +358,98 @@ export function initRace(root: ParentNode): void {
     shapeSelect!.disabled = racing || improveRacing;
   }
 
+  // This race has its own slider, sitting beside it. Amendment 5 wired it to the
+  // main race's slider instead, which worked and was around 1500px above the
+  // animation it controlled on a phone -- Amendment 6 supersedes that decision
+  // for speed only. Two independent sliders, each next to what it drives, rather
+  // than two views of one value that have to be kept in sync.
+  function improveStepMs(): number {
+    const rate = Number(improveSpeed.value);
+    return Number.isFinite(rate) && rate > 0 ? 1000 / rate : DEFAULT_STEP_MS;
+  }
+
   function setImproveControls(): void {
     const ready = chosen !== null && !improveRacing;
     improveShuffle.disabled = !ready;
     improveRaceButton.disabled = !ready;
+    // The comparison is 120 sorts of arrays of its own, finished in about a
+    // millisecond and touching nothing the animation uses, so it stays available
+    // while a race animates.
+    improveRerun.disabled = chosen === null;
     for (const button of cardList.querySelectorAll("button")) {
       button.disabled = improveRacing;
     }
+  }
+
+  /**
+   * The 20-run comparison (PLAN.md Amendment 6). All three shapes at once, one
+   * improvement against its own original, so a reader can see the same change
+   * help on one shape, do nothing on another and cost comparisons on a third --
+   * which one race, on one array, of one shape cannot show.
+   */
+  function runImproveStats(): void {
+    if (chosen === null) return;
+    const algorithm = chosen;
+    const improvement = IMPROVEMENTS[algorithm];
+
+    // Each shape gets its own sample; within a shape the identical 20 arrays go
+    // to both variants, because improvementComparison is handed the arrays and
+    // counts both sides from the same one.
+    const rows = SHAPE_KEYS.map((shape) => ({
+      shape,
+      result: improvementComparison(algorithm, shapeSample(shape, ARRAY_LENGTH, STATS_RUNS)),
+    }));
+
+    const variant = ALGORITHM_VARIANTS[algorithm] || "ordinary version";
+    improveStatsScope.textContent = `${ALGORITHM_LABELS[algorithm]}, ${variant} vs ${improvement.label}: ${STATS_RUNS} arrays of each shape, the same ${STATS_RUNS} to both.`;
+
+    const headerRow = document.createElement("tr");
+    for (const label of ["Starting data", "Original", "Improved", "Won / tied / lost"]) {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = label;
+      headerRow.append(th);
+    }
+    improveStatsHead.replaceChildren(headerRow);
+
+    improveStatsBody.replaceChildren(
+      ...rows.map(({ shape, result }) => {
+        const tr = document.createElement("tr");
+        tr.dataset.shape = shape;
+
+        const name = document.createElement("th");
+        name.scope = "row";
+        name.textContent = SHAPE_LABELS[shape];
+        tr.append(name);
+
+        const original = result.originalAverage.toFixed(1);
+        const improved = result.improvedAverage.toFixed(1);
+        // Classified on the two numbers as displayed, so the tint can never
+        // disagree with what the row shows: rounding to the same tenth is what
+        // "does nothing here" looks like at this sample size. Read by an
+        // attribute selector in styles.css to tint the row; the numbers carry the
+        // meaning on their own, so the colour is reinforcement, not the message.
+        tr.dataset.direction =
+          original === improved
+            ? "same"
+            : result.improvedAverage < result.originalAverage
+              ? "better"
+              : "worse";
+
+        for (const text of [
+          original,
+          improved,
+          `${result.improvedWins} / ${result.ties} / ${result.improvedLosses}`,
+        ]) {
+          const cell = document.createElement("td");
+          cell.textContent = text;
+          tr.append(cell);
+        }
+        return tr;
+      }),
+    );
+
+    improveStats.dataset.algorithm = algorithm;
   }
 
   function newImproveArray(): void {
@@ -405,6 +497,10 @@ export function initRace(root: ParentNode): void {
     setImproveControls();
     describeImproveShape();
     newImproveArray();
+    // Automatic, not behind a button: choosing a card is the press. The table is
+    // then never an empty frame, and it is rebuilt for the new algorithm rather
+    // than leaving the previous card's numbers under this card's heading.
+    runImproveStats();
   }
 
   // Deliberately not reusing runPanel: that one reads the main race's shared
@@ -426,7 +522,7 @@ export function initRace(root: ParentNode): void {
         onDone(result.value.comparisons);
         return;
       }
-      setTimeout(step, currentStepMs());
+      setTimeout(step, improveStepMs());
     }
     step();
   }
@@ -497,6 +593,12 @@ export function initRace(root: ParentNode): void {
 
   improveShuffle.addEventListener("click", newImproveArray);
   improveRaceButton.addEventListener("click", improveRace);
+  // A fresh 60 arrays. Pressing it repeatedly is how the random pivot's row on
+  // random input shows itself as a coin flip while its two ordered rows barely
+  // move -- no copy required, and no copy would be believed as readily.
+  improveRerun.addEventListener("click", runImproveStats);
+  // No listener on the improvement slider either: improveStepMs() reads it when
+  // scheduling the next frame, so a mid-race drag lands on the next step.
 
   for (const id of PANEL_IDS) {
     const panel = panels[id];
