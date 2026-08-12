@@ -72,6 +72,16 @@ like good practice.
 - **Both viewports before you call it done.** 1920×1080 and 390×844 both count in
   full at marking. Look at the rendered page with `agent-browser` and tell me what
   you saw --- don't infer it from the CSS.
+- **If the thing you built is a process, check it over time --- not in stills.**
+  Screenshots verify layout; they cannot verify an animation. Step through the
+  frames and confirm the intermediate states are states the data could actually
+  be in. On assignment 1 you took six screenshots across both viewports and
+  called the sorting race done; over half of Merge Sort's frames were displaying
+  a duplicate bar height --- an array the data is never in --- and every check
+  stayed green, because nothing asserted that a frame is a permutation of the
+  input. A still of a mid-animation moment looks correct even when the frames
+  either side of it are nonsense. When the intermediate states are the
+  explanation, they are the thing to test, not just the end state.
 - **Anything that appears on every page has to sit in the same place on every
   page.** The nav especially. On crit 1 my four pages had titles and subtitles of
   different lengths; on a phone they wrapped to different numbers of lines, so the
