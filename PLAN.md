@@ -1588,6 +1588,161 @@ rule, the bar colours, and every number. Amendment 8 settled those two hours ago
   as more compact or merely tighter; and whether the four-link `nav` earns its
   place or is the furniture you just asked me to remove, wearing a different hat.
 
+## Amendment 10 — V2.0: a design system, not a redecoration (13 August 2026)
+
+The brief, in your words: the functionality is solid, but the page still looks
+like a default prototype. A visual polish pass, no behaviour and no information
+architecture changes. Stronger section hierarchy and spacing; the plain blue
+anchor nav replaced with a compact tab/pill style; buttons, selects and sliders
+styled consistently instead of browser defaults; clearer card/surface treatment
+on the race panels and the statistics/finding sections; winner emphasis that
+feels deliberate rather than "a blue border"; subtle background, borders, radius
+and typography hierarchy rather than added decoration. Restrained, accessible,
+responsive. Show the direction before large structural changes.
+
+**Nothing in this amendment changes an algorithm, a generator, a sample size, a
+measured number, a word of copy, or what any control does.** It is one file:
+`styles.css`, rewritten around a token set.
+
+### Why the page looks like a prototype — measured, not asserted
+
+I counted the current stylesheet before designing anything.
+
+| | Today | Reads as |
+|---|---|---|
+| Distinct `font-size` values | **9** (0.7 / 0.75 / 0.8 / 0.85 / 0.9 / 0.95 / 1 / 1.05 / 1.35rem) plus `h1`'s browser-default 2rem | no type scale — ten sizes chosen one at a time |
+| Distinct hex colours | **17**, ad hoc (`#555`×7, `#ddd`×6, `#666`, `#777`, `#999`, `#333`, `#eee`, `#f4f4f4`, `#fafafa`, …) | five greys doing one grey's job |
+| `box-shadow` rules | **0** | nothing sits on anything; everything is on one plane |
+| `:focus-visible` rules | **0** | keyboard focus is whatever Chrome draws |
+| Border radii | 3 values | close enough to be an accident, not a system |
+| Page background | pure white, same as every panel | no surfaces, so no hierarchy |
+
+That is the actual diagnosis behind "default prototype": the page has no
+background/surface distinction, no type scale and no elevation, so every
+element is equally loud and the eye has nothing to follow. The fix is a token
+set, not new decoration.
+
+### The direction: three planes, one accent, four frozen data colours
+
+**Planes.** The page becomes `--page` (`#f4f5f7`); every section becomes a white
+`--surface` card with a 14px radius, a soft hairline and a faint shadow; the
+control rows and the improvement well become a recessed `--surface-2`. Three
+planes is the whole spatial system — page, surface, recess — and it replaces the
+1px top rules currently separating sections. This is the one *structural* change
+in the pass and the reason I am showing it before applying it.
+
+**Type.** Six tokens (`--text-xs` 0.75 → `--text-xl` 2rem), down from ten
+ad-hoc sizes, on a ratio rather than by feel. Section headings, panel micro-labels
+(uppercase, letter-spaced, `--text-xs`) and body copy then differ by role rather
+than by a value somebody typed.
+
+**One accent, four frozen data colours.** `--accent` (`#0b5fff`) is the only
+non-neutral in the chrome. The four bar colours — default blue, compared amber
+`#f59e0b`, pivot violet `#7c3aed`, in-place green `#16a34a` — are **frozen and
+untouched**: they are the page's legend, so restyling them would restyle the
+explanation. That constraint is why the primary buttons are filled in **ink, not
+blue**: a blue Race button standing beside blue bars puts the same colour on a
+control and on data.
+
+**Emphasis, deliberately.** The winner panel gets three coordinated cues instead
+of one border: the accent border, a 3px translucent ring, and a soft lift. In
+the tables, a fewest-in-column cell gets the tint it already has *plus* an inset
+2px accent rule on its leading edge and the average in accent-ink; the selected
+finding card gets the same ring treatment as the winner panel, so "this one is
+picked out" looks the same everywhere on the page. Rings are `box-shadow`, which
+costs no layout, so nothing shifts when a winner appears.
+
+### The six bullets, and what each one became
+
+| Your bullet | What it is in the CSS |
+|---|---|
+| Stronger section hierarchy and spacing | three planes, `--text-lg`/600 headings, uniform 1.5rem section padding, `--r-lg` corners |
+| Compact tab/pill nav | `.sections a` → white pills, `--r-pill`, 1px border, hover fills the accent tint; no more raw blue underlined links |
+| Consistent buttons/selects/sliders | one `--control-h` (2.375rem) for every button and select; `appearance: none` on selects with the chevron redrawn as an inline SVG so it matches on every platform; the slider's track and thumb drawn explicitly in `-webkit-`/`-moz-` rules |
+| Card/surface treatment | every section a surface; race panels, finding cards and the improvement block become nested cards/wells |
+| Deliberate winner/state emphasis | border + ring + lift, matched across winner panel, selected card and fewest-cell |
+| Subtle, not decorative | 28 tokens; two shadows, both very low-contrast; three raw hex left in the file (white and black, on the primary button) |
+
+### The accessibility work is not a footnote — I broke it once
+
+My first pass used one soft border token (`#cbd2dc`) for both card edges and
+control edges, because that is the fashionable look. Measured, it was **1.52:1
+on white and 1.43:1 on the controls strip** — WCAG 1.4.11 asks **3:1** for the
+visual boundary that identifies a user-interface component. A prettier page in
+which no button has a findable edge. So the token is split:
+
+- `--line` `#e3e6ec` — decorative card hairlines only (1.25:1, and correctly so:
+  a card edge is not a control).
+- `--control-line` `#848d9c` — everything that is a control: buttons, selects,
+  **and the finding cards**, which are `<button>`s whose whole surface is the
+  click target. **3.35:1** on white, **3.15:1** on the recessed strip.
+
+Measured (`contrast10.mjs`, sRGB relative luminance per WCAG 2.1):
+
+| | Today | After |
+|---|---|---|
+| Worst text pair | **4.48:1 — fails 1.4.3** (`#777` win/tie/loss counts at 0.7rem, in both tables) | **5.00:1** (disabled button label; every other pair ≥ 5.36:1) |
+| Control boundary | `#1a1a1a` on white, 17:1 | 3.35:1 / 3.15:1 |
+| Keyboard focus | no rule — browser default only | one global `:focus-visible`: 2px accent, 2px offset, 5.13:1 |
+
+So the pass **fixes a real pre-existing contrast failure** rather than only
+avoiding new ones. A `prefers-reduced-motion` block is added for the transitions.
+
+### Measured before/after, in Chrome at both viewports
+
+Built the site, served the candidate stylesheet over the hashed asset in `dist/`,
+and measured the real page — `styles.css` and the tracked tree untouched.
+
+| | desktop 1920×1080 | phone 390×844 |
+|---|---|---|
+| Page height | 2358 → **2494px** (+5.8%) | 3797 → **4034px** (+6.2%) |
+| Race panels | 436 / 436 → **431 / 431** (still equal) | 358 / 358 → **321 / 321** |
+| Nav | 1 row, 23 → **34px** | 1 row 23px → **2 rows, 74px** |
+| Horizontal overflow | 0 → **0** | 0 → **0** |
+
+The page gets about 6% taller. That is the honest cost of surfaces and padding,
+and I am not going to describe it as "more compact".
+
+### Ambiguities — yours to settle, not mine
+
+1. **The phone nav now wraps to two rows.** Amendment 9 specifically got all four
+   links onto one line at 390px by deleting the dot separators; pill padding
+   spends that margin again — 3 pills then 1, +51px. It wraps cleanly (no
+   dangling anything), but it is a measured regression against a thing I made a
+   point of last time. Options: accept it; or tighten pill padding and type at
+   ≤640px until four fit, at the cost of the phone nav no longer matching the
+   desktop nav's scale. **I have built it as "accept it".**
+2. **Making all four sections into surfaces is layout structure**, which is on
+   the trigger-test list. It is the pass's whole spine — without it there is no
+   hierarchy to strengthen — but it is the one thing here I would not have done
+   without asking.
+3. **A text cue for the winner would be stronger than any colour treatment** —
+   a "fewest" chip on the winning panel. It would also be new content, which the
+   brief forbids, and the comparison counts under each panel already say who won.
+   Not built. Raising it because "restrained" and "obvious" pull opposite ways
+   here and that is your call, not mine.
+4. **`--control-line` is visibly darker than a fashionable hairline.** That is
+   deliberate and it is the accessibility trade above. If it reads as heavy to
+   you, the thing to change is my standard, out loud — not the token quietly.
+
+### What's machine-checked vs. judgement, for this amendment
+
+- **Machine-checked:** `pnpm check` in full (typecheck, build, oxlint, stylelint
+  with `stylelint-config-standard`, the whole vitest suite). No spec test asserts
+  a colour or a size, and none should — the existing suite asserts the contract,
+  and this amendment must not change the contract. **If any spec test goes red,
+  the pass has changed behaviour and is wrong.** That is the actual check here.
+- **Verified in Chrome, both viewports, because JSDOM has no layout engine:**
+  every number in the two tables above, plus re-running the Amendment 9 geometry
+  suite (`v19.mjs`) unchanged — button heights equal, bar boxes equal, both
+  control rows wrapping identically, no horizontal overflow, and the two races'
+  selectors still independent across 260 sampled animation frames.
+- **Measured, not eyeballed:** all contrast ratios above.
+- **Judgement, yours:** whether this reads as a considered interface or as a
+  themed prototype; whether the winner emphasis is deliberate enough without a
+  text cue; whether 6% more page height buys enough hierarchy; and whether the
+  pills are worth two rows on a phone.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
