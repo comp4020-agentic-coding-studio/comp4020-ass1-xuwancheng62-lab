@@ -38,20 +38,31 @@ function* mergeSort(input: number[]): SortGenerator {
 
     const left = arr.slice(lo, mid);
     const right = arr.slice(mid, hi);
+    const merged: number[] = [];
     let i = 0;
     let j = 0;
-    let k = lo;
+
+    // Writing merged values straight back into `arr` would leave the region
+    // holding a mix of new and stale values, so a frame could show the same
+    // value twice -- an array the data is never in (PLAN.md Amendment 1).
+    // Instead the region always reads as: what we've merged so far, then
+    // whatever is left of each run. Those three parts are exactly the
+    // original elements of the region, so every frame stays a permutation,
+    // and you can watch the merged prefix grow as the two runs are consumed.
+    function commit(): void {
+      const view = [...merged, ...left.slice(i), ...right.slice(j)];
+      for (let n = 0; n < view.length; n++) arr[lo + n] = view[n];
+    }
+
     while (i < left.length && j < right.length) {
       comparisons++;
-      if (left[i] <= right[j]) {
-        arr[k++] = left[i++];
-      } else {
-        arr[k++] = right[j++];
-      }
+      merged.push(left[i] <= right[j] ? left[i++] : right[j++]);
+      commit();
       yield;
     }
-    while (i < left.length) arr[k++] = left[i++];
-    while (j < right.length) arr[k++] = right[j++];
+    while (i < left.length) merged.push(left[i++]);
+    while (j < right.length) merged.push(right[j++]);
+    commit();
     yield;
   }
 
