@@ -15,25 +15,22 @@ a {
   color: #0b5fff;
 }
 
-/* The section links that replaced the Home link (Amendment 9). Laid out as a
-   wrapping flex row so the four sit on one line on a desktop and reflow to two
-   on a phone rather than overflowing. The separators are drawn with a ::before
-   on every link except the first -- a border would need an extra element, and a
-   literal "·" in the HTML would be read out by a screen reader as content. */
+/* The section links that replaced the Home link (Amendment 9). A wrapping flex
+   row: `gap` is the space BETWEEN items, and `flex-wrap` moves an item to the
+   next line rather than letting it overflow the page.
+
+   I first drew "·" separators with a ::before on each link after the first, and
+   the rendered phone page showed why that was wrong: the four links wrapped to
+   two lines and the dot belonging to "Improvements" travelled with it, so the
+   second line opened with a floating dot. The separator now is the gap itself
+   plus the link underline, which cannot dangle -- and dropping the dots freed
+   enough width that all four fit on one line at 390px anyway. */
 .sections {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.9rem;
+  gap: 0.35rem 1.1rem;
   margin: 0.35rem 0 1.25rem;
   font-size: 0.9rem;
-}
-
-.sections a + a::before {
-  content: "·";
-  display: inline-block;
-  margin-right: 0.9rem;
-  color: #999;
-  text-decoration: none;
 }
 
 /* Amendment 9: one rule for both control rows. They had drifted apart -- this
