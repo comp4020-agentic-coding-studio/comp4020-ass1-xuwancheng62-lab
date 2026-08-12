@@ -7,13 +7,22 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header>
-      <nav aria-label="Primary">
-        <a href="./">Home</a>
-      </nav>
-    </header>
     <main>
       <h1>Sorting race</h1>
+      <!--
+        Amendment 9: the Home link is gone -- it was a one-page site's only
+        navigation pointing at the page you were already on. The <nav> itself
+        stays, because spec/invariants.test.ts requires a navigation landmark on
+        every built page, and it now earns that name: four in-page links to the
+        four sections, which at 390px is worth having on a page 4,600px tall.
+        It sits under the <h1> so the title is the top of the page.
+      -->
+      <nav aria-label="Sections" class="sections">
+        <a href="#race">Race</a>
+        <a href="#stats">Statistics</a>
+        <a href="#findings">What we found</a>
+        <a href="#improve">Improvements</a>
+      </nav>
       <p>
         Bubble, insertion, merge and quick sort all solve the same problem: put
         these bars in order. Pick two, press <strong>Race</strong>, and count the
@@ -26,11 +35,11 @@
         at all while its two panels carried h2s, which made "Side A" a sibling of
         the section titles in the document outline. The panels are h3 now.
       -->
-      <section class="race">
+      <section class="race" id="race">
         <h2>Race</h2>
 
         <div class="controls">
-          <button type="button" data-testid="shuffle-button">New start</button>
+          <button type="button" data-testid="shuffle-button">New array</button>
           <button type="button" data-testid="race-button">Race</button>
           <span class="shape">
             <label for="shape-select">Starting data</label>
@@ -90,7 +99,7 @@
         </div>
       </section>
 
-      <section class="stats">
+      <section class="stats" id="stats">
         <h2>Statistics</h2>
         <!-- The heading is one word now, so the question it used to ask moves
              here rather than being lost. -->
@@ -126,7 +135,7 @@
       <!-- Findings only: what the table showed, one card each. The fixes live in
            the next section, which is what "finding first, then improvement"
            means at the page level as well as inside a card. -->
-      <section class="findings">
+      <section class="findings" id="findings">
         <h2>What we found</h2>
         <ol class="cards" data-testid="finding-cards"></ol>
       </section>
@@ -150,6 +159,20 @@
             <button type="button" data-testid="improve-race" disabled>
               Race
             </button>
+            <!-- Amendment 9: its own Starting data selector, built like the main
+                 race's. The two are independent from load -- changing one leaves
+                 the other's array alone -- so the improvement race is its own
+                 experiment rather than a second view of the one above. The
+                 sentence that used to say "both sides start from the same nearly
+                 reversed array" is gone: the select says it, in the same row. -->
+            <span class="shape">
+              <label for="improve-shape-select">Starting data</label>
+              <select
+                id="improve-shape-select"
+                data-testid="improve-shape-select"
+                disabled
+              ></select>
+            </span>
             <span class="speed">
               <label for="improve-speed">Speed</label>
               <span aria-hidden="true">Slow</span>
@@ -163,7 +186,6 @@
               />
               <span aria-hidden="true">Fast</span>
             </span>
-            <span class="improve-shape" data-testid="improve-shape"></span>
           </div>
           <!-- The same key as the main race. A colour with no key is decoration,
                and "consistently in both races" has to include the key. -->

@@ -161,14 +161,13 @@ export function initRace(root: ParentNode): void {
   // showed the selected shape and stale numbers would have sat under a caption
   // naming a different one. The table now names all three itself, so there is
   // no mismatch to prevent -- see PLAN.md Amendment 4.
+  // Amendment 9: this now changes the main race and nothing else. Under
+  // Amendments 5 and 6 it also re-rolled the improvement race, which shared this
+  // one selector; that race has its own now, and reaching 3,000px down the page
+  // to restart an animation the reader cannot see was the reason to stop.
   function changeShape(): void {
     if (racing) return;
     newStart();
-    // Amendment 5: the improvement race takes its condition from this same
-    // selector rather than adding a second one, so it gets a fresh array of the
-    // new shape too (a no-op until a finding has been chosen).
-    describeImproveShape();
-    newImproveArray();
   }
 
   // Pulls one comparison at a time from the algorithm's generator, redraws,
@@ -342,7 +341,7 @@ export function initRace(root: ParentNode): void {
   // duplication rather than context.
   const improveChange = need('[data-testid="improve-change"]');
   const improveExpect = need('[data-testid="improve-expect"]');
-  const improveShapeNote = need('[data-testid="improve-shape"]');
+  const improveShapeSelect = need<HTMLSelectElement>('[data-testid="improve-shape-select"]');
   const improveShuffle = need<HTMLButtonElement>('[data-testid="improve-shuffle"]');
   const improveRaceButton = need<HTMLButtonElement>('[data-testid="improve-race"]');
   const improveSpeed = need<HTMLInputElement>('[data-testid="improve-speed"]');
@@ -375,10 +374,18 @@ export function initRace(root: ParentNode): void {
   let improveArray: number[] = [];
   let improveRacing = false;
 
-  // Both races share the one Starting data selector, so the lock has to account
-  // for both: whichever is still running keeps it disabled.
+  // Amendment 9 gave this race its own Starting data selector, so each race now
+  // locks only its own: the shared lock that used to disable one select while
+  // either race ran is gone. A race's input shape is still fixed for its own
+  // duration -- changing the condition mid-experiment would make the counter on
+  // screen a number about two different arrays.
   function syncShapeLock(): void {
-    shapeSelect!.disabled = racing || improveRacing;
+    shapeSelect!.disabled = racing;
+    improveShapeSelect.disabled = chosen === null || improveRacing;
+  }
+
+  function currentImproveShape(): ShapeKey {
+    return improveShapeSelect.value as ShapeKey;
   }
 
   // This race has its own slider, sitting beside it. Amendment 5 wired it to the
@@ -402,6 +409,10 @@ export function initRace(root: ParentNode): void {
     for (const button of cardList.querySelectorAll("button")) {
       button.disabled = improveRacing;
     }
+    // Disabled until a finding is chosen, like the buttons beside it: a selector
+    // that changes the shape of a race that does not exist yet is a control with
+    // nothing behind it.
+    syncShapeLock();
   }
 
   /**
@@ -526,7 +537,7 @@ export function initRace(root: ParentNode): void {
 
   function newImproveArray(): void {
     if (chosen === null || improveRacing) return;
-    improveArray = INPUT_SHAPES[currentShape()](ARRAY_LENGTH);
+    improveArray = INPUT_SHAPES[currentImproveShape()](ARRAY_LENGTH);
     for (const side of IMPROVE_SIDES) {
       renderBars(improveSides[side].bars, improveArray, ARRAY_LENGTH);
       improveSides[side].counter.textContent = "0";
@@ -535,15 +546,10 @@ export function initRace(root: ParentNode): void {
     }
   }
 
-  // The condition, restated inside the area. The reader can change the shape with
-  // the selector far above, and a result whose input shape is off-screen is a
-  // number without its condition attached.
-  function describeImproveShape(): void {
-    improveShapeNote.textContent =
-      chosen === null
-        ? ""
-        : `Both sides start from the same ${SHAPE_LABELS[currentShape()].toLowerCase()} array.`;
-  }
+  // Amendment 9 deleted describeImproveShape(). It restated the condition in a
+  // sentence because the only selector was up to 3,000px above this race; the
+  // selector is now in this race's own control row, so the sentence was telling
+  // the reader something already on screen a centimetre away.
 
   function chooseFinding(algorithm: AlgorithmKey): void {
     if (improveRacing) return;
@@ -566,7 +572,6 @@ export function initRace(root: ParentNode): void {
       button.setAttribute("aria-pressed", String(selected));
     }
     setImproveControls();
-    describeImproveShape();
     newImproveArray();
     // Automatic, not behind a button: choosing a card is the press. The table is
     // then never an empty frame, and it is rebuilt for the new algorithm rather
@@ -682,6 +687,10 @@ export function initRace(root: ParentNode): void {
   }
 
   improveShuffle.addEventListener("click", newImproveArray);
+  // Same handler shape as the main race's: change the condition, get a fresh
+  // array of that condition. It deliberately does not touch the 20-array table
+  // below, which reports all three shapes at once and so cannot go stale.
+  improveShapeSelect.addEventListener("change", newImproveArray);
   improveRaceButton.addEventListener("click", improveRace);
   // A fresh 60 arrays. Pressing it repeatedly is how the random pivot's row on
   // random input shows itself as a coin flip while its two ordered rows barely
@@ -702,13 +711,18 @@ export function initRace(root: ParentNode): void {
   panels.a.select.value = "bubble";
   panels.b.select.value = "quick";
 
-  for (const [value, label] of Object.entries(SHAPE_LABELS)) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    shapeSelect.append(option);
+  // Both selectors are filled from the same SHAPE_LABELS, so they can never offer
+  // different shapes, and they start on the same value -- independent from load
+  // does not mean starting out of step.
+  for (const select of [shapeSelect, improveShapeSelect]) {
+    for (const [value, label] of Object.entries(SHAPE_LABELS)) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.append(option);
+    }
+    select.value = "random";
   }
-  shapeSelect.value = "random";
 
   shuffleButton.addEventListener("click", newStart);
   raceButton.addEventListener("click", race);

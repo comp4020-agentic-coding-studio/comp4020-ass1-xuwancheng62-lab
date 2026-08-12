@@ -10,6 +10,7 @@ import {
   IMPROVED_ALGORITHMS,
   IMPROVEMENTS,
   INPUT_SHAPES,
+  SHAPE_LABELS,
   SORT_ALGORITHMS,
   averageDirection,
   comparisonStats,
@@ -58,7 +59,7 @@ const IMPROVE_MARKUP = `
     <p data-testid="improve-change"></p>
     <button type="button" data-testid="improve-shuffle" disabled></button>
     <button type="button" data-testid="improve-race" disabled></button>
-    <span data-testid="improve-shape"></span>
+    <select data-testid="improve-shape-select" disabled></select>
     <section data-testid="improve-panel-original">
       <small data-testid="improve-variant-original"></small>
       <div data-testid="improve-bars-original"></div>
@@ -1152,23 +1153,148 @@ describe("the improvement race", () => {
     }
   });
 
-  // No second shape selector: the improvement race reads the same control the
-  // main race does, so the two are always asking about the same condition.
-  it("takes its starting shape from the existing selector", () => {
+  // Amendment 9 REVERSES Amendment 5's decision (reaffirmed in Amendment 6),
+  // which was "no second shape selector -- the improvement race reads the same
+  // control the main race does". The old test asserting that is deleted, not
+  // relaxed: the improvement race now owns its starting shape, so the two races
+  // are independent experiments rather than two views of one condition.
+  it("offers the same three starting shapes as the main race", () => {
+    const { document } = setup();
+    const improveSelect = document.querySelector(
+      '[data-testid="improve-shape-select"]',
+    ) as HTMLSelectElement;
+    const mainSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+
+    const options = (select: HTMLSelectElement) =>
+      [...select.options].map((option) => [option.value, option.textContent]);
+
+    expect(
+      options(improveSelect).map(([value]) => value),
+      "the improvement race does not offer exactly the three shapes",
+    ).toEqual(SHAPE_KEYS);
+    // Same labels too, not just the same keys: two controls that read
+    // differently look like two different questions.
+    expect(options(improveSelect), "the two selectors disagree about the shapes").toEqual(
+      options(mainSelect),
+    );
+    expect(improveSelect.value, "the improvement race does not start on random").toBe("random");
+  });
+
+  it("re-rolls its own array to the chosen shape, both sides identical", () => {
     const { dom, document, click, barValues } = setup();
-    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    const improveSelect = document.querySelector(
+      '[data-testid="improve-shape-select"]',
+    ) as HTMLSelectElement;
     click("finding-card-quick");
 
-    shapeSelect.value = "nearlySorted";
-    shapeSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    improveSelect.value = "nearlySorted";
+    improveSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
     const ordered = barValues("original");
     expect(ordered, "the two sides diverged on a shape change").toEqual(barValues("improved"));
     expect(inversions(ordered), `not nearly sorted: ${ordered.join(", ")}`).toBeLessThanOrEqual(40);
 
+    improveSelect.value = "nearlyReversed";
+    improveSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    const reversed = barValues("original");
+    expect(reversed, "the two sides diverged on a second shape change").toEqual(
+      barValues("improved"),
+    );
+    // Nearly reversed is nearly-sorted's mirror: almost every pair is inverted.
+    const pairs = (reversed.length * (reversed.length - 1)) / 2;
     expect(
-      document.querySelector('[data-testid="improve-shape"]')!.textContent,
-      "the area does not say which shape it is racing",
-    ).toContain("nearly sorted");
+      inversions(reversed),
+      `not nearly reversed: ${reversed.join(", ")}`,
+    ).toBeGreaterThanOrEqual(pairs - 40);
+  });
+
+  // The independence is the point of the amendment, and it has to hold in BOTH
+  // directions -- a shared array would show up as one selector silently redrawing
+  // the other race's bars.
+  it("leaves the other race's array alone, in both directions", () => {
+    const { dom, document, click, barValues } = setup();
+    const improveSelect = document.querySelector(
+      '[data-testid="improve-shape-select"]',
+    ) as HTMLSelectElement;
+    const mainSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+    const mainBars = () =>
+      [...document.querySelectorAll('[data-testid="bars-a"] .bar')].map((bar) =>
+        Number((bar as HTMLElement).dataset.value),
+      );
+    click("finding-card-bubble");
+
+    const mainBefore = mainBars();
+    improveSelect.value = "nearlyReversed";
+    improveSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    expect(mainBars(), "the improvement selector redrew the main race").toEqual(mainBefore);
+
+    const improveBefore = barValues("original");
+    mainSelect.value = "nearlySorted";
+    mainSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    expect(barValues("original"), "the main selector redrew the improvement race").toEqual(
+      improveBefore,
+    );
+    expect(barValues("improved"), "the main selector split the improvement race").toEqual(
+      improveBefore,
+    );
+  });
+
+  // Each race locks only its own selector. Locking both would make one race's
+  // controls go dead while the other one runs, which reads as a bug.
+  it("locks each starting-data selector to its own race", () => {
+    const { document, click } = setup();
+    const improveSelect = document.querySelector(
+      '[data-testid="improve-shape-select"]',
+    ) as HTMLSelectElement;
+    const mainSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
+
+    // Disabled until a finding is chosen, like the other improvement controls --
+    // there is no array to re-roll before then.
+    expect(improveSelect.disabled, "the improvement selector was live before a card").toBe(true);
+    expect(mainSelect.disabled, "the main selector started disabled").toBe(false);
+
+    click("finding-card-merge");
+    expect(improveSelect.disabled, "the improvement selector stayed locked after a card").toBe(
+      false,
+    );
+
+    click("improve-race");
+    vi.advanceTimersToNextTimer();
+    expect(improveSelect.disabled, "the improvement selector stayed live mid-race").toBe(true);
+    expect(mainSelect.disabled, "the improvement race locked the main selector").toBe(false);
+    vi.runAllTimers();
+    expect(improveSelect.disabled, "the improvement selector stayed locked after its race").toBe(
+      false,
+    );
+
+    click("race-button");
+    vi.advanceTimersToNextTimer();
+    expect(mainSelect.disabled, "the main selector stayed live mid-race").toBe(true);
+    expect(improveSelect.disabled, "the main race locked the improvement selector").toBe(false);
+    vi.runAllTimers();
+  });
+
+  // The 20-array table is shape-INDEPENDENT: it reports all three shapes at once,
+  // so a shape change has nothing to tell it. This asserts it does not quietly
+  // rebuild (which would look like the numbers had been re-measured for the new
+  // shape, and they would not have been).
+  it("does not rebuild the 20-array table when the shape changes", () => {
+    const { dom, document, click } = setup();
+    const improveSelect = document.querySelector(
+      '[data-testid="improve-shape-select"]',
+    ) as HTMLSelectElement;
+    click("finding-card-insertion");
+
+    const head = document.querySelector('[data-testid="improve-stats-head"]')!;
+    const body = document.querySelector('[data-testid="improve-stats-body"]')!;
+    const headings = [...head.querySelectorAll("th")].map((th) => th.textContent);
+    for (const shape of SHAPE_KEYS) {
+      expect(headings, `the table stopped reporting ${shape}`).toContain(SHAPE_LABELS[shape]);
+    }
+    const before = body.innerHTML;
+
+    improveSelect.value = "nearlyReversed";
+    improveSelect.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    expect(body.innerHTML, "a shape change re-rendered the three-shape table").toBe(before);
   });
 
   it("ends both sides sorted, with counts that then stop changing", () => {
@@ -1239,17 +1365,14 @@ describe("the improvement race", () => {
     expect(counter("improved"), "the re-race produced no count").toBeGreaterThan(0);
   });
 
-  it("locks the shape selector while it is racing, and unlocks it afterwards", () => {
-    const { document, click } = setup();
-    const shapeSelect = document.querySelector('[data-testid="shape-select"]') as HTMLSelectElement;
-    click("finding-card-merge");
-    expect(shapeSelect.disabled, "selector was locked before any race").toBe(false);
-
-    click("improve-race");
-    expect(shapeSelect.disabled, "the condition was changeable mid-race").toBe(true);
-    vi.runAllTimers();
-    expect(shapeSelect.disabled, "selector stayed locked after the race").toBe(false);
-  });
+  // A second check deleted by Amendment 9, deliberately and out loud: this used
+  // to assert that the improvement race locked the MAIN race's shape selector,
+  // which was correct while the two races shared one condition. They no longer
+  // do, so the assertion is now backwards -- locking a control that has nothing
+  // to do with the running race just makes the page look broken. What it was
+  // protecting (you cannot change the condition out from under a running race)
+  // is kept by "locks each starting-data selector to its own race" above, which
+  // checks both races and both selectors instead of one pairing.
 
   /*
    * The comparison block below the animated race (PLAN.md Amendment 6).
@@ -1764,6 +1887,92 @@ describe("the shipped index.html", () => {
       [...document.querySelectorAll(".race .panel h3")].map((h) => h.textContent!.trim()),
       "the race panels are not h3 titles",
     ).toEqual(["Side A", "Side B"]);
+  });
+
+  // Amendment 9: Home is gone and the title is the top of the page. The <nav>
+  // itself stays because spec/invariants.test.ts requires a navigation landmark,
+  // so this asserts the landmark is REAL -- links that go somewhere, and none of
+  // them pointing at the page you are already on. A hidden or empty nav would
+  // pass the invariant and fail this, which is the point of writing it.
+  it("opens on the title, with a navigation landmark that goes somewhere", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    const main = document.querySelector("main")!;
+    expect(
+      main.firstElementChild!.tagName,
+      "something sits above the page title inside main",
+    ).toBe("H1");
+    expect(main.firstElementChild!.textContent!.trim()).toBe("Sorting race");
+    expect(document.querySelector("header"), "the old header is still in the page").toBeNull();
+
+    const navs = [...document.querySelectorAll("nav")];
+    expect(navs.length, "not exactly one navigation landmark").toBe(1);
+    const links = [...navs[0].querySelectorAll("a")];
+    expect(links.length, "the nav has no links in it").toBeGreaterThan(1);
+    for (const link of links) {
+      const text = link.textContent!.trim();
+      expect(text, "the Home link is still in the nav").not.toBe("Home");
+      expect(text.length, "a nav link with no text").toBeGreaterThan(0);
+
+      // Every link resolves to a section that exists. A nav pointing at a
+      // missing id is the same dead end as a broken external link, and the
+      // links check in CI does not look at fragments.
+      const href = link.getAttribute("href")!;
+      expect(href, `nav link "${text}" is not an in-page link`).toMatch(/^#/);
+      expect(
+        document.querySelector(href),
+        `nav link "${text}" points at ${href}, which is not in the page`,
+      ).toBeTruthy();
+    }
+
+    // The nav sits under the title, not above it.
+    expect(
+      main.firstElementChild!.compareDocumentPosition(navs[0]) & 4,
+      "the nav is above the page title",
+    ).toBeGreaterThan(0);
+  });
+
+  // Both re-roll buttons say the same thing, because they do the same thing.
+  it('calls both re-roll buttons "New array"', () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    for (const testid of ["shuffle-button", "improve-shuffle"]) {
+      expect(
+        document.querySelector(`[data-testid="${testid}"]`)!.textContent!.trim(),
+        `${testid} does not say New array`,
+      ).toBe("New array");
+    }
+    expect(html, "New start is still in the page").not.toContain("New start");
+  });
+
+  // Amendment 9's second Starting data selector, in the shipped page rather than
+  // in the fixture: labelled, in the improvement race's own controls row, and
+  // disabled at load like the rest of them.
+  it("gives the improvement race its own labelled starting-data selector", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+
+    const selects = [...document.querySelectorAll("select[data-testid$='shape-select']")];
+    expect(selects.length, "not exactly two starting-data selectors").toBe(2);
+    for (const select of selects) {
+      const id = select.getAttribute("id")!;
+      expect(
+        document.querySelector(`label[for="${id}"]`)?.textContent?.trim(),
+        `the ${id} selector is not labelled "Starting data"`,
+      ).toBe("Starting data");
+    }
+
+    const improve = document.querySelector('[data-testid="improve-shape-select"]')!;
+    expect(
+      improve.closest(".improve .controls"),
+      "the improvement selector is not in the improvement race's controls row",
+    ).toBeTruthy();
+    expect(improve.hasAttribute("disabled"), "the improvement selector ships unlocked").toBe(true);
+
+    // The sentence it replaced is gone -- it named one shape, and the reader can
+    // now choose any of the three.
+    expect(html, "the fixed shape sentence is still in the page").not.toContain("improve-shape\"");
   });
 
   // The findings section holds the discoveries; the improvements section holds the

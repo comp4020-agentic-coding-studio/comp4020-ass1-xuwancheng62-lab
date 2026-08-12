@@ -15,9 +15,38 @@ a {
   color: #0b5fff;
 }
 
+/* The section links that replaced the Home link (Amendment 9). Laid out as a
+   wrapping flex row so the four sit on one line on a desktop and reflow to two
+   on a phone rather than overflowing. The separators are drawn with a ::before
+   on every link except the first -- a border would need an extra element, and a
+   literal "·" in the HTML would be read out by a screen reader as content. */
+.sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+  margin: 0.35rem 0 1.25rem;
+  font-size: 0.9rem;
+}
+
+.sections a + a::before {
+  content: "·";
+  display: inline-block;
+  margin-right: 0.9rem;
+  color: #999;
+  text-decoration: none;
+}
+
+/* Amendment 9: one rule for both control rows. They had drifted apart -- this
+   one was `align-items: normal` and only wrapped below 640px, while
+   `.improve .controls` centred and wrapped always. Measured at 390px, that left
+   the race row's buttons and labels at three different tops, up to 48px apart.
+   `center` lines a 36px button up with a 22px label; `wrap` at every width means
+   a row that outgrows its container reflows instead of overflowing. */
 .controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
+  align-items: center;
   margin: 1.5rem 0;
 }
 
@@ -36,16 +65,18 @@ a {
   cursor: pointer;
 }
 
-/* Smaller than the race buttons: rerunning the comparison is a secondary action
-   next to the race itself. Targeted by class, not as `.improve button` -- as a
-   bare element selector it would share its last compound with the
-   `button:disabled` rule below and be overridden by it, which is what
-   stylelint's no-descending-specificity catches. It also has to sit above that
-   rule for the same reason. */
+/* Amendment 9 took the size difference out. This used to render 31px tall at
+   14.4px type, the only button on the page not 36px at 16px, which read as an
+   odd control rather than a quiet one. It is still the secondary action -- it
+   keeps the outline treatment while the two Race buttons are filled -- so the
+   hierarchy survives without the size doing the work.
+
+   Targeted by class, not as `.improve button` -- as a bare element selector it
+   would share its last compound with the `button:disabled` rule below and be
+   overridden by it, which is what stylelint's no-descending-specificity catches.
+   It also has to sit above that rule for the same reason. */
 .improve .rerun {
   margin-top: 1.25rem;
-  font-size: 0.9rem;
-  padding: 0.4rem 1rem;
 }
 
 .controls button:disabled,
@@ -61,26 +92,23 @@ a {
   color: #fff;
 }
 
-.shape {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.shape select {
-  font-size: 1rem;
-  padding: 0.25rem;
-}
-
-/* The slider stays enabled while the buttons are disabled mid-race, because
-   changing the speed of a running race is the point of it. */
+/* One treatment for both control labels, rather than the 0.9rem/#1a1a1a and
+   0.85rem/#555 they had. Two labels sitting in the same row at two sizes was the
+   kind of difference nobody can name and everybody can see. The slider stays
+   enabled while the buttons are disabled mid-race, because changing the speed of
+   a running race is the point of it. */
+.shape,
 .speed {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   font-size: 0.85rem;
   color: #555;
+}
+
+.shape select {
+  font-size: 1rem;
+  padding: 0.25rem;
 }
 
 .speed input {
@@ -465,10 +493,10 @@ main h2 {
   color: #666;
 }
 
+/* Only the margin differs now -- alignment and wrapping moved to the shared
+   `.controls` rule in Amendment 9. */
 .improve .controls {
   margin: 1rem 0;
-  align-items: center;
-  flex-wrap: wrap;
 }
 
 /* .improve-finding was here until Amendment 8. It repeated the chosen card's
@@ -480,10 +508,10 @@ main h2 {
   color: #555;
 }
 
-.improve-shape {
-  font-size: 0.8rem;
-  color: #555;
-}
+/* .improve-shape was here until Amendment 9. It styled the sentence "Both sides
+   start from the same nearly reversed array", which existed only because the one
+   selector was up to 3,000px above this race. There is a selector in this row
+   now, so the sentence went with it. */
 
 .improve-expect {
   margin: 1.25rem 0 0;
@@ -503,17 +531,18 @@ main h2 {
     grid-template-columns: 1fr;
   }
 
-  .controls {
-    flex-wrap: wrap;
-  }
-
   /* The area holds two stacked panels on a phone, so its own padding comes down
      to keep the pair inside one scroll of the finding that opened it. */
   .improve {
     padding: 0.75rem;
   }
 
-  .improve .bars {
+  /* Amendment 9: 9rem in BOTH races. The improvement race was already 9rem here
+     while the main race stayed at 13rem, so the same animation ran at two sizes
+     on the screen where the difference is most obvious. Unified downwards --
+     sixteen bars still read clearly at 160px tall across a 296px box, and the
+     phone page loses about 96px, which is the direction "compact" points. */
+  .bars {
     height: 9rem;
   }
 }
