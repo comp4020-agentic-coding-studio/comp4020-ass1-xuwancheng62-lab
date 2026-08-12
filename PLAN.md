@@ -1425,6 +1425,169 @@ before it), plus the four cards' findings.
   two registries, both speed sliders, the shape selector's scope, the ±2.5
   tolerance, and every number the page reports.
 
+## Amendment 9 — V1.9: a second selector, no nav, and a measured tidy-up (13 August 2026)
+
+The brief, in your words: add the same Starting data selector to the Improvement
+Race (Random / Nearly sorted / Nearly reversed). Then, one more feature before
+final cleanup — remove Home and make **Sorting race** the top of the page, change
+**New start** to **New array**, and make small UI/layout improvements across the
+page so it feels clean, compact and consistent, especially spacing, alignment,
+controls, cards and section hierarchy.
+
+Nothing here changes an algorithm, a generator, a sample size, the comparison
+metric, or any measured number. It adds one control, removes one link, renames one
+button, and corrects inconsistencies I measured rather than guessed at.
+
+### The one thing that isn't mine to decide: `nav` is a graded invariant
+
+`spec/invariants.test.ts:44` asserts `doc.querySelector("nav")` on **every built
+page**. That file is the course template's, not mine — it is the `spec` check, and
+green checks at the crit are worth half the shipped mark. So "remove Home" is not
+a free edit: the page currently has exactly one `nav`, containing exactly one link,
+and that link is Home.
+
+You are right that the link is noise. A one-page site whose only navigation points
+at the page you are already on is furniture, not navigation. But there are four
+ways to act on that and they are not equivalent:
+
+| | What ships | Invariant | Honest? |
+|---|---|---|---|
+| **A** | `nav` under the `h1`, holding the four section links — Race, Statistics, What we found, Improvements | green | yes — it is navigation, and the phone page is 4,624px tall |
+| **B** | `nav` holding one skip link ("Skip to improvements") | green | yes, but odd-looking for a four-section page |
+| **C** | `nav` kept but visually hidden, Home removed | green | **no** — a landmark no one can see, and the check passes on a technicality |
+| **D** | Delete `header`/`nav`, delete the invariant test | **red** | it is not my check to delete |
+
+**I recommend A.** It is the only option that makes the removal an improvement
+rather than a subtraction: the four links are the four headings you standardised in
+Amendment 8, and at 390×844 the Improvements section starts 3,029px down, so
+reaching it currently costs eight or nine flicks. It also puts `h1` first in the
+document, which is what "Sorting race is the top of the page" asks for — the `nav`
+sits *under* the title rather than above it.
+
+**A costs you four links you did not ask for.** That is the trade, stated plainly,
+because "don't add features I haven't asked for" is a standing rule and this is me
+asking rather than deciding. C is available and I will not choose it silently: it
+keeps every check green while making the page less honest, which is the exact shape
+of the trap the harness exists to catch. D is off the table.
+
+### The second selector reverses a decision I recorded twice
+
+Amendment 5 decided the improvement race takes its shape from the existing
+selector, and Amendment 6 decision 2 reaffirmed it in writing — "the shape still
+comes from the existing Starting data selector". The reason given was one control,
+one condition, both races always asking the same question. You are overruling that,
+which is yours to do; recording it here so the reversal is visible rather than
+looking like drift.
+
+It also **deletes a test of mine**: `spec/race.test.ts` has `"takes its starting
+shape from the existing selector"`, whose comment reads "No second shape selector:
+the improvement race reads the same control the main race does". That test asserts
+the behaviour you are removing, so it goes, and a new one replaces it asserting the
+opposite: changing the main selector leaves the improvement race's array alone, and
+changing the improvement selector leaves the main race's alone. Flagged out loud
+per "my own checks are mine to change — out loud", not quietly deleted.
+
+**Design:**
+
+1. **Fully independent, from load.** The improvement selector starts on the same
+   value the main one starts on, and after that neither touches the other. The
+   alternative — synced until the reader touches the second one — was considered
+   and rejected: it makes the main selector silently re-roll an animation up to
+   3,000px below the reader's viewport, and a control whose reach you cannot see
+   is worse than two controls whose reach is obvious.
+2. **Each race locks only its own selector** while it animates. `syncShapeLock`
+   currently disables the single shared select when *either* race runs; with two
+   selects that shared lock disappears, which is a simplification rather than a
+   new mechanism.
+3. **The 20-array table does not rebuild.** It already reports all three shapes as
+   three columns, so it is shape-independent and the new selector cannot invalidate
+   it. Stated so nobody later wires a needless rebuild to the change event.
+4. **The `improve-shape` sentence is deleted.** It currently reads "Both sides
+   start from the same nearly reversed array." It exists only because the control
+   was 2,000px away; with a labelled select sitting in the same row, it restates
+   what the reader can see. That is 8 more words gone, consistent with Amendment
+   7's direction.
+5. **Both "new array" buttons say `New array`.** Renaming the main one as asked
+   makes it identical to the improvement race's existing button. Two buttons with
+   one label on one page is normally a smell; here it is correct — it is the same
+   action on two different arrays, each inside its own titled section. Noted rather
+   than asked about, because the brief names the string.
+
+### The tidy-up, from measurements rather than impressions
+
+Measured in Chrome at both viewports on the current build (`/tmp/pw/audit19.mjs`),
+because "feels inconsistent" is not actionable and these numbers are:
+
+| # | What I measured | Fix |
+|---|---|---|
+| 1 | `.race .controls` is `align-items: normal` + `flex-wrap: nowrap`; `.improve .controls` is `align-items: center` + `wrap`. Two control rows, two different layout rules. | One rule for both: `center`, `wrap`. |
+| 2 | At 390px the race row's children are 36 / 29 / 22px tall with **three different tops** — the labels sit up to 48px below the buttons. | Falls out of fix 1. |
+| 3 | "Run 20 more arrays" renders **31px tall at 14.4px type**; every other button on the page is **36px at 16px**. | Same height and type as the rest; stays visually secondary through its border and weight, not by being smaller. |
+| 4 | The improvement panels are **415px** wide against the main race's **436px**; bars 379 vs 400. The same animation, two sizes. | Match them. |
+| 5 | At 390px the improvement bar boxes are **160px** tall against the main race's **208px** — a 30% difference in the same animation. | See the open question below. |
+| 6 | Section rhythm *is* already consistent (40px margin + 24px padding + 1px rule on all three lower sections) — no fix needed. | Leave it. |
+| 7 | Page height: **2,862px** desktop, **4,624px** phone. | Fix 5's answer moves this; nothing else here is dead space I can cut without blurring the hierarchy you just set. |
+
+Also in scope, all small and none of them changing a number: the two `Algorithm`
+labels and the `Starting data` / `Speed` labels get one shared treatment; card
+padding lines up with panel padding; and the `.improve` block's inner padding comes
+down so the nested section stops reading as a second page.
+
+**Not in scope:** the palette, the type scale, the four headings, the cards-per-row
+rule, the bar colours, and every number. Amendment 8 settled those two hours ago.
+
+### Ambiguities — I need your call on these
+
+1. **The `nav`.** A, B, or C above. D is unavailable. I recommend **A**.
+2. **The phone bar height (fix 5).** Unify *up* to 208px in both races — bigger
+   animation, phone page grows by roughly 96px — or *down* to 160px in both —
+   consistent and about 96px shorter, serving "compact", at the cost of a smaller
+   animation on the small screen where it is already smallest. I lean **down to
+   160**, because "compact" was named in the brief and 160px still shows sixteen
+   bars clearly at 296px wide.
+3. **Where the new selector sits.** In the `.improve .controls` row beside New
+   array / Race / Speed (consistent with the main race, one more thing in an
+   already four-item row), or on its own line directly under the `h3` (clearer at
+   390px, where that row already wraps to three lines). I lean **in the row**, for
+   consistency with the main race.
+
+### Ambiguities, and how you settled them
+
+1. **The `nav`** → **A.** Four section links — Race, Statistics, What we found,
+   Improvements — in a `nav` under the `h1`. Home goes, `h1` becomes the first
+   thing in the document, the invariant stays green on its merits rather than on a
+   technicality, and the four links are the four headings from Amendment 8 rather
+   than a new vocabulary. This is the one place this amendment adds something you
+   did not ask for, and it is here because the alternative that adds nothing (C)
+   passes the check dishonestly.
+2. **Phone bar height** → **down to 160px in both races.** Consistent and about
+   96px shorter on the phone, which is the direction "compact" points. The desktop
+   stays at 208px in both.
+3. **Selector position** → **in the `.improve .controls` row**, matching the main
+   race. At 390px that row wraps to four lines instead of three; if that reads as
+   crowded once built, it is a two-line CSS change and I will say so rather than
+   quietly moving it.
+
+### What's machine-checked, and what isn't
+
+- **Machine-checked, added here:** the improvement race has its own shape select
+  with exactly the three shapes; changing it re-rolls the improvement array to that
+  shape and leaves the main race's array untouched; changing the main select leaves
+  the improvement array untouched; both sides of the improvement race still start
+  from one identical array after either change; each select is disabled only by its
+  own race; the improvement table still reports all three shapes and does not
+  rebuild on a shape change; exactly one `nav` exists in the built page with no
+  link whose text is "Home"; `h1` is the first element in `main`; and both
+  "new array" buttons read `New array`.
+- **Not machine-checkable, verified in Chrome instead:** every item in the
+  tidy-up table. They are rendered geometry — computed heights, box widths,
+  child tops — and JSDOM has no layout engine, which is the same gap the card
+  alignment fix hit an hour ago.
+- **Judgement, yours:** whether the second selector makes the improvement race
+  feel like its own experiment or like a duplicated control; whether the page reads
+  as more compact or merely tighter; and whether the four-link `nav` earns its
+  place or is the furniture you just asked me to remove, wearing a different hat.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
