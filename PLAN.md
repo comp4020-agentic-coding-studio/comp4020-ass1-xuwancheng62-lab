@@ -1743,6 +1743,86 @@ and I am not going to describe it as "more compact".
   text cue; whether 6% more page height buys enough hierarchy; and whether the
   pills are worth two rows on a phone.
 
+## Amendment 10a — accepted, plus two things you found (13 August 2026)
+
+Amendment 10 is approved and applied. This addendum records the two changes you
+asked for on top of it, written separately rather than edited into Amendment 10,
+because that one is frozen the moment you approved it.
+
+### 1. A stronger masthead
+
+The pass had the title at a flat 2rem — the same size on a 1920px desktop as on a
+390px phone, which is why the top of the page still read as a heading rather than
+as a header.
+
+- `h1` is now `clamp(2rem, 1.35rem + 2.2vw, 2.6rem)`: the browser sizes it from
+  the window itself, **32px** at 390px and **41.6px** at 1920px, with no second
+  breakpoint and no chance of overflow, because both ends are absolute.
+- The intro paragraph becomes the **lede** at `--text-md` (18px), so the masthead
+  is a descending scale — 41.6 → 18 → 16px — instead of three items at one weight.
+- The nav pills get a firmer edge, more padding, full-ink label text, and a hover
+  that fills with the accent tint. Their border moves from `--line` to
+  `--control-line` for the same reason the finding cards did: **a pill is a
+  control, 1.4.11 wants 3:1 of the boundary that says so**, and with the
+  underline gone the pill shape is the only thing left saying "link".
+
+I did **not** add a `<header>` wrapper, a masthead band, or a rule under the
+intro. The first is blocked by my own Amendment 9 test (`h1` must be
+`main.firstElementChild`, no `<header>`); the last two are decoration, which the
+brief rules out.
+
+### 2. The improvement table overflowed — and my check could not see it
+
+You were right, and the interesting part is why nothing caught it.
+
+Measured at 390px: the improvement table wants **337px** and its slot is
+**321px**, so it drew **16px outside the white card**. It is the narrowest box on
+the page — it pays for the Improvements card's padding *and* the improvement
+well's, which the statistics table does not. **The page-level check said fine**,
+because `document.scrollWidth === clientWidth`: the body's own padding absorbed
+the spill, so the document never overflowed even though the card visibly did.
+
+**That check was too weak and I have changed it, out loud.** `v20.mjs` now asserts
+containment — every element stays inside its own section card — rather than
+asking whether the window scrolls sideways. Overflowing your own container is the
+failure a reader sees; overflowing the document is only the loudest version of it.
+
+The fix is two parts:
+
+- **Fit,** at ≤640px: cell padding 0.7rem → 0.4rem, header letter-spacing 0.06em
+  → 0.02em, row-name type down one step. That is ~50px of width that was being
+  spent on styling rather than on data. Result at 390px: **292px table in a 292px
+  slot — exact fit, no scrollbar.**
+- **A floor,** at every width: both tables now sit in a `.table-scroll` box
+  (`overflow-x: auto`). Below about 330px the columns hit a minimum they cannot go
+  under, and the box scrolls instead of the table escaping the card. Chrome makes
+  a scrollable box keyboard-focusable by itself, so this does not strand the
+  numbers for anyone not using a mouse.
+
+Verified across four widths — 1920, 390, 375 and 320 — with an improvement open
+and its table populated, because an empty table cannot overflow:
+
+| width | statistics table | improvement table | escapes its card |
+|---|---|---|---|
+| 1920 | 878 in 878 | 836 in 836 | none |
+| **390** | 321 in 321 | **292 in 292** | **none** |
+| 375 | 306 in 306 | 281 in 277 → scrolls | none |
+| 320 | 251 in 251 | 281 in 222 → scrolls | none |
+
+One new JSDOM test (`"keeps both statistics tables in a box that can scroll"`)
+holds the floor. It cannot check the fit — JSDOM has no layout engine, which is
+the whole reason this got past me — but it can check that the escape hatch is
+still wired up if a longer variant label or a font change widens a column later.
+
+### Two corrections to my own new check, before it went green
+
+The control-boundary assertion fired twice on things that were not defects: the
+**selected** finding card, whose accent border is the deliberate picked-out state,
+and the rerun button, which was still under the mouse from the click that
+populated the table and so was reporting its `:hover` colour mid-transition. Both
+were the check being wrong, not the page. It now parks the pointer, waits past the
+120ms transition, and exempts the selected state.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants

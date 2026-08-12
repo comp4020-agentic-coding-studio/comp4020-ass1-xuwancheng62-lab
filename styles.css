@@ -1,50 +1,216 @@
+/* ==========================================================================
+   Design tokens (PLAN.md Amendment 10).
+
+   Custom properties -- `--name: value` declared on :root, read back anywhere as
+   `var(--name)`. They are here because the measurement that started this pass
+   found 9 font sizes, 17 hex colours, 3 radii and 0 shadows scattered across
+   the file, with no way to tell which were decisions and which were drift. A
+   token is the decision; every rule below spends tokens rather than inventing
+   values, so "one type scale" is enforceable by reading this block.
+   ========================================================================== */
+:root {
+  /* Ink. Three weights only: body, secondary, and the small print. */
+  --ink: #16181d;
+  --ink-2: #4a5160;
+  --ink-3: #5f6775;
+
+  /* Lines and surfaces. The page is no longer white: it is --page, and the
+     things that used to be white boxes on a white page are now white surfaces
+     ON that page, which is what makes them read as cards without extra rules. */
+  --page: #f4f5f7;
+  --surface: #fff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eef0f4;
+  --line: #e3e6ec;
+
+  /* --control-line is NOT a lighter/darker sibling of --line: it is the border
+     that draws a button or a select, and WCAG 1.4.11 asks for 3:1 against the
+     surface behind it, because that border is the only thing saying "this is a
+     control". My first pass used a soft #cbd2dc for both and measured 1.43:1
+     against the controls strip -- prettier, and a control you cannot find. At
+     #848d9c it measures 3.35:1 on white and 3.15:1 on the strip. --line stays
+     soft because a card edge is decoration, not a control. */
+  --control-line: #848d9c;
+
+  /* One accent, used for interface state AND for the default bar, so the page
+     never asks the reader to hold two blues apart. --accent-ink is the same
+     hue darkened for small text, where 5.13:1 is thinner than it should be. */
+  --accent: #0b5fff;
+  --accent-ink: #0a49c9;
+  --accent-tint: #eef3ff;
+
+  /* The three data colours are FROZEN. They are the legend -- the page's
+     explanation of what the animation is doing -- not part of the theme, so
+     this pass does not touch them. */
+  --compared: #f59e0b;
+  --pivot: #7c3aed;
+  --in-place: #16a34a;
+
+  /* Type scale: six steps at roughly 1.2x, replacing nine ad-hoc sizes. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 2rem;
+
+  /* Corner radius, small to large. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* Two elevations: resting, and lifted on hover or selection. */
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 5%);
+  --shadow-md: 0 1px 2px rgb(16 24 40 / 4%), 0 10px 28px -16px rgb(16 24 40 / 18%);
+
+  /* One control height for buttons and selects, so a row of mixed controls
+     lines up by construction rather than by two padding values agreeing. */
+  --control-h: 2.375rem;
+}
+
 body {
   margin: 0;
-  padding: 2rem;
+  padding: 2.5rem 2rem 4rem;
+  background: var(--page);
   font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
   line-height: 1.6;
-  color: #1a1a1a;
+  color: var(--ink);
+
+  /* Kerning and ligature defaults differ between browsers at these sizes;
+     naming them keeps the headings identical in Chrome and Safari. */
+  text-rendering: optimizelegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 main {
-  max-width: 56rem;
+  max-width: 58rem;
   margin: 0 auto;
 }
 
 a {
-  color: #0b5fff;
+  color: var(--accent-ink);
 }
 
-/* The section links that replaced the Home link (Amendment 9). A wrapping flex
-   row: `gap` is the space BETWEEN items, and `flex-wrap` moves an item to the
-   next line rather than letting it overflow the page.
+/* One focus ring for every interactive thing on the page. :focus-visible is the
+   modern form of :focus -- it fires for keyboard navigation but not for a mouse
+   click, so the ring appears when it is useful and stays out of the way
+   otherwise. Styling controls with custom backgrounds removes the browser's own
+   ring, so this is not decoration: without it, keyboard users lose the page. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 
-   I first drew "·" separators with a ::before on each link after the first, and
-   the rendered phone page showed why that was wrong: the four links wrapped to
-   two lines and the dot belonging to "Improvements" travelled with it, so the
-   second line opened with a floating dot. The separator now is the gap itself
-   plus the link underline, which cannot dangle -- and dropping the dots freed
-   enough width that all four fit on one line at 390px anyway. */
+/* The masthead. `clamp(min, preferred, max)` sets the title's size from the
+   viewport width itself: 2rem on a 390px phone, growing with the window to a
+   2.6rem ceiling on a 1920px desktop. One declaration instead of a size plus a
+   breakpoint, and it never overflows because the min and max are absolute. */
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 1.35rem + 2.2vw, 2.6rem);
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+/* Section headings. -0.01em tracking at this size stops a system-ui heading
+   looking loose next to the tighter h1. */
+main h2 {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+/* The section links that replaced the Home link (Amendment 9), restyled as
+   pills (Amendment 10). A wrapping flex row: `gap` is the space BETWEEN items,
+   and `flex-wrap` moves an item to the next line rather than overflowing.
+
+   The underline is gone because the pill shape now carries "this is a link" --
+   that trade is safe HERE and not in body text, where shape gives no such clue
+   and the underline is the only non-colour signal a link exists. */
 .sections {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 1.1rem;
-  margin: 0.35rem 0 1.25rem;
-  font-size: 0.9rem;
+  gap: 0.45rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* Amendment 9: one rule for both control rows. They had drifted apart -- this
-   one was `align-items: normal` and only wrapped below 640px, while
-   `.improve .controls` centred and wrapped always. Measured at 390px, that left
-   the race row's buttons and labels at three different tops, up to 48px apart.
-   `center` lines a 36px button up with a 22px label; `wrap` at every width means
-   a row that outgrows its container reflows instead of overflowing. */
+/* --control-line, not --line: a pill is a control, and WCAG 1.4.11 asks 3:1 of
+   the boundary that says so. It is also the only thing left saying "link" here
+   -- the underline is gone because the pill shape carries that job, which is
+   safe HERE and not in body text, where shape gives no such clue. */
+.sections a {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.sections a:hover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+
+/* The four story steps, each on its own surface. This is what replaced the
+   1px top rules: a card on a tinted page separates two sections far more
+   clearly than a hairline, and it is the same treatment the brief asked for on
+   the statistics and findings sections, so all four get it rather than two. */
+.race,
+.stats,
+.findings,
+.improvements {
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* The intro paragraph under the title is page-level, not section-level, so it
+   stays off the surfaces and sits directly on the page. Sized one step above
+   body copy so the masthead reads as title -> nav -> lede rather than as three
+   stacked items at the same weight. */
+main > p {
+  max-width: 46rem;
+  margin: 1.25rem 0 0;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* Amendment 9: one rule for both control rows. `center` lines a 38px button up
+   with a 22px label; `wrap` at every width means a row that outgrows its
+   container reflows instead of overflowing.
+
+   Amendment 10 puts the row on its own recessed strip, so the controls read as
+   one instrument panel rather than as four loose widgets above the bars. */
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.6rem 0.85rem;
   align-items: center;
-  margin: 1.5rem 0;
+  margin: 1.25rem 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-2);
 }
 
 /* One button style for both the race controls and the statistics button.
@@ -54,24 +220,29 @@ a {
 .controls button,
 .stats button,
 .improve .rerun {
-  font-size: 1rem;
-  padding: 0.5rem 1.25rem;
-  border: 1px solid #1a1a1a;
-  border-radius: 0.25rem;
-  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-h);
+  padding: 0 1rem;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-/* Amendment 9 took the size difference out. This used to render 31px tall at
-   14.4px type, the only button on the page not 36px at 16px, which read as an
-   odd control rather than a quiet one. It is still the secondary action -- it
-   keeps the outline treatment while the two Race buttons are filled -- so the
-   hierarchy survives without the size doing the work.
-
-   Targeted by class, not as `.improve button` -- as a bare element selector it
+/* Targeted by class, not as `.improve button` -- as a bare element selector it
    would share its last compound with the `button:disabled` rule below and be
-   overridden by it, which is what stylelint's no-descending-specificity catches.
-   It also has to sit above that rule for the same reason. */
+   overridden by it, which is what stylelint's no-descending-specificity
+   catches. It also has to sit above that rule for the same reason. */
 .improve .rerun {
   margin-top: 1.25rem;
 }
@@ -79,79 +250,182 @@ a {
 .controls button:disabled,
 .stats button:disabled,
 .improve .rerun:disabled {
-  opacity: 0.5;
+  box-shadow: none;
+  background: var(--surface-3);
+  color: var(--ink-3);
   cursor: not-allowed;
 }
 
+.controls button:hover:not(:disabled),
+.stats button:hover:not(:disabled),
+.improve .rerun:hover:not(:disabled) {
+  border-color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+/* The primary action is filled in INK, not in the accent blue. Blue is the
+   bars' default colour, and a blue Race button beside blue bars would put the
+   same colour on a control and on data. Dark fill keeps blue meaning "data". */
 .controls button[data-testid="race-button"],
 .controls button[data-testid="improve-race"] {
-  background: #1a1a1a;
+  border-color: var(--ink);
+  background: var(--ink);
   color: #fff;
 }
 
-/* One treatment for both control labels, rather than the 0.9rem/#1a1a1a and
-   0.85rem/#555 they had. Two labels sitting in the same row at two sizes was the
-   kind of difference nobody can name and everybody can see. The slider stays
-   enabled while the buttons are disabled mid-race, because changing the speed of
-   a running race is the point of it. */
+.controls button[data-testid="race-button"]:hover:not(:disabled),
+.controls button[data-testid="improve-race"]:hover:not(:disabled) {
+  border-color: #000;
+  background: #000;
+}
+
+/* One treatment for both control labels. The slider stays enabled while the
+   buttons are disabled mid-race, because changing the speed of a running race
+   is the point of it. */
 .shape,
 .speed {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  font-size: 0.85rem;
-  color: #555;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 
-.shape select {
-  font-size: 1rem;
-  padding: 0.25rem;
+/* Selects, styled rather than left to the browser. `appearance: none` strips
+   the platform widget -- which is the only way to control its height, border
+   and radius -- and that also removes the drop-down arrow, so the arrow is
+   drawn back on as a background SVG. It is inline (a data: URI) rather than a
+   file because a separate request for a 12x8 chevron is not worth it, and
+   because the artefact that gets marked is a built folder that must not depend
+   on an asset path resolving. `%23` is an escaped `#` in the colour. */
+.shape select,
+.panel select {
+  appearance: none;
+  height: var(--control-h);
+  padding: 0 2rem 0 0.7rem;
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-sm);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235f6775' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  box-shadow: var(--shadow-sm);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  cursor: pointer;
 }
 
-.speed input {
+.panel select {
+  display: block;
+  margin-top: 0.35rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.shape select:disabled {
+  background-color: var(--surface-3);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.shape select:hover:not(:disabled),
+.panel select:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+
+/* Sliders. Like selects, a range input is a platform widget, and the track and
+   the thumb are separate sub-parts that each browser exposes under its own
+   pseudo-element name. They cannot be listed in one selector: a browser that
+   does not recognise one name discards the WHOLE rule, so -webkit- and -moz-
+   get identical declarations in separate rules on purpose. */
+.speed input[type="range"] {
+  appearance: none;
   width: 7rem;
+  height: 1.25rem;
+  background: none;
+  cursor: pointer;
+}
+
+.speed input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.3rem;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+}
+
+.speed input[type="range"]::-moz-range-track {
+  height: 0.3rem;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+}
+
+.speed input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-top: -0.325rem;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.speed input[type="range"]::-moz-range-thumb {
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 
 .panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .panel {
-  border: 2px solid #ddd;
-  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   padding: 1rem;
-  transition: border-color 150ms ease;
+  background: var(--surface);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
+/* Winner emphasis. The old version moved one border colour, which is the
+   definition of "just a blue border" -- and colour alone is also the weakest
+   possible signal for a reader who cannot separate these hues.
+
+   Three things change together instead: the border takes the accent, a second
+   ring is drawn OUTSIDE it with box-shadow (a spread-only shadow, which costs
+   no layout because shadows do not take space, so the panel does not shift by
+   a pixel when it wins), and the panel lifts. Ring thickness and elevation are
+   both visible without hue discrimination. The comparison counts sitting under
+   each panel remain the actual statement of who won; this only points at it. */
 .panel[data-winner="true"] {
-  border-color: #0b5fff;
-}
-
-/* Amendment 8: one size for the four section headings, a smaller one for
-   everything nested inside them. The four were all 1.1rem, the same as the panel
-   titles, so the page's four steps were distinguishable only by position. */
-main h2 {
-  font-size: 1.35rem;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px rgb(11 95 255 / 12%),
+    0 10px 24px -14px rgb(11 95 255 / 45%);
 }
 
 .panel h3 {
-  margin-top: 0;
-  font-size: 1.05rem;
+  margin: 0 0 0.85rem;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
 }
 
 .panel label {
   display: block;
-  font-size: 0.9rem;
-  margin-bottom: 0.75rem;
-}
-
-.panel select {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 1rem;
-  padding: 0.25rem;
+  margin-bottom: 0.85rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
 }
 
 .bars {
@@ -159,16 +433,17 @@ main h2 {
   align-items: flex-end;
   gap: 2px;
   height: 12rem;
-  background: #f4f4f4;
-  border-radius: 0.25rem;
-  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 0.6rem;
+  background: var(--surface-2);
 }
 
 .bar {
   flex: 1;
   min-width: 2px;
-  background: #0b5fff;
-  border-radius: 2px 2px 0 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
   transition: height 60ms linear;
 }
 
@@ -180,31 +455,32 @@ main h2 {
 
    Green is deliberately the same green a finished panel turns, so the whole-panel
    green at the end reads as every bar being in place rather than as a second,
-   unrelated signal (PLAN.md Amendment 8). */
+   unrelated signal (PLAN.md Amendment 8). Amendment 10 left all four values
+   untouched: they are the key, and restyling them would restyle the finding. */
 .bar[data-role="compared"] {
-  background: #f59e0b;
+  background: var(--compared);
 }
 
 .bar[data-role="pivot"] {
-  background: #7c3aed;
+  background: var(--pivot);
 }
 
 .bar[data-role="in-place"] {
-  background: #16a34a;
+  background: var(--in-place);
 }
 
 .panel[data-sorted="true"] .bar {
-  background: #16a34a;
+  background: var(--in-place);
 }
 
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  gap: 0.35rem 0.9rem;
   align-items: center;
-  margin: -0.75rem 0 1.5rem;
-  font-size: 0.85rem;
-  color: #555;
+  margin: 0 0 1rem;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
 }
 
 .legend span {
@@ -216,56 +492,80 @@ main h2 {
 /* ::before is the colour swatch -- a decorative square with no text, so it
    belongs in CSS rather than as an empty element in the markup. */
 .legend span::before {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 2px;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 3px;
   content: "";
 }
 
 .legend span[data-role="compared"]::before {
-  background: #f59e0b;
+  background: var(--compared);
 }
 
 .legend span[data-role="pivot"]::before {
-  background: #7c3aed;
+  background: var(--pivot);
 }
 
 .legend span[data-role="in-place"]::before {
-  background: #16a34a;
+  background: var(--in-place);
 }
 
 /* The improvement race has its own copy of the key, sitting next to its own two
    panels rather than 1500px above them -- the same decision as its own speed
-   slider. Tightened up because it is inside a panel that already has padding. */
+   slider. */
 .improve .legend {
-  margin: 0 0 0.75rem;
-  font-size: 0.8rem;
+  margin: 0 0 0.85rem;
 }
 
 /* Two placements, one honest claim. Up by the controls this is a single line so
    the race stays the focus; the full version sits under the statistics table,
    next to the two numbers it qualifies (PLAN.md Amendment 4). */
 .variants {
-  margin: -0.75rem 0 1.5rem;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: #555;
+  margin: 0 0 1.25rem;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ink-2);
 }
 
-.stats .variants {
-  margin: 1.5rem 0 0;
-  border-left: 3px solid #ddd;
-  padding-left: 0.75rem;
-  font-size: 0.85rem;
+/* The qualifying notes -- this one, and the improvement race's expectation --
+   share one treatment: a recessed strip with an accent edge, so "read this
+   about the numbers" looks the same wherever it appears. */
+.stats .variants,
+.improve-expect {
+  margin: 1.25rem 0 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--control-line);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-2);
 }
 
 .status {
-  margin: 0.75rem 0 0;
-  font-size: 0.95rem;
+  margin: 0.85rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 
 .status output {
+  font-size: var(--text-md);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* A table has a minimum width -- four columns of numbers cannot be squeezed past
+   the widest thing in each one -- and below that width it does not shrink, it
+   spills. `overflow-x: auto` makes the box around it scroll instead, so the
+   table stays inside its white card at any width. On a phone this is a floor
+   and not the normal case: the rules in the 640px block below bring the table
+   itself down to fit, so no scrollbar appears at 390px. Chrome makes a
+   scrollable box keyboard-focusable on its own, so this does not strand the
+   data for anyone who is not using a mouse. */
+.table-scroll {
+  overflow-x: auto;
 }
 
 /* The improvement comparison is the same kind of object as the statistics matrix
@@ -274,8 +574,9 @@ main h2 {
 .stats table,
 .improve table {
   width: 100%;
-  margin-top: 1.5rem;
-  border-collapse: collapse;
+  margin-top: 1.25rem;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
 }
 
@@ -284,10 +585,10 @@ main h2 {
 .stats caption,
 .improve caption {
   caption-side: bottom;
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: #555;
+  margin-top: 0.85rem;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--ink-2);
   text-align: left;
 }
 
@@ -295,35 +596,53 @@ main h2 {
 .stats td,
 .improve th,
 .improve td {
-  border-bottom: 1px solid #eee;
-  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.6rem 0.7rem;
+  vertical-align: top;
 }
 
-/* Equal number columns, so a column is read as one condition rather than sized by
-   how long its heading happens to be. Both tables use this class, so the
-   statistics matrix and the improvement comparison share one type scale, one cell
-   anatomy and one highlight (PLAN.md Amendment 7).
+/* The header row is the only place the table needs a stronger line: it divides
+   the labels from the data, where the body rows only separate one row from the
+   next. Uppercase micro-type is the same treatment as the panel's field label,
+   so "this is a label, not a value" looks identical in both places. */
+.stats thead th,
+.improve thead th {
+  border-bottom: 1px solid var(--control-line);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
 
-   Amendment 7 also needed a 30% override for the comparison, which then had two
-   variant columns against the matrix's three shape columns, so 22% each left half
-   that table as an empty row-label column. Amendment 8 transposed the comparison
-   to the same three shape columns, so the override is gone: one width rule for
-   both tables, which is what sharing the class was for. */
+.matrix tbody th {
+  font-size: var(--text-sm);
+}
+
+/* Equal number columns, so a column is read as one condition rather than sized
+   by how long its heading happens to be. Both tables use this class, so the
+   statistics matrix and the improvement comparison share one type scale, one
+   cell anatomy and one highlight (PLAN.md Amendment 7). */
 .matrix thead th:not(:first-child),
 .matrix tbody td {
   width: 22%;
 }
 
 /* The average is the number being compared across columns, so it gets the size;
-   the win count is the same fact at lower resolution and sits under it. */
+   the win count is the same fact at lower resolution and sits under it.
+   tabular-nums makes every digit the same width, so the averages line up
+   vertically down a column instead of drifting with the digits they contain. */
 .matrix .avg {
-  font-size: 1.05rem;
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .matrix td small {
   display: block;
-  font-size: 0.7rem;
-  color: #777;
+  margin-top: 0.1rem;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 
   /* One line always, so every row is the same height and the averages stay on a
      scannable baseline across the three columns. */
@@ -335,12 +654,13 @@ main h2 {
    cheapest under this condition in the statistics matrix, and whether the
    improvement or the original is cheaper on this shape in the comparison. */
 .matrix tbody td[data-fewest="true"] {
-  background: #eef3ff;
+  background: var(--accent-tint);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .matrix tbody td[data-fewest="true"] .avg {
   font-weight: 700;
-  color: #0b5fff;
+  color: var(--accent-ink);
 }
 
 /* The variant note sits under the row's name in the same cell, so the qualifier
@@ -349,19 +669,17 @@ main h2 {
    Improved in the comparison. */
 .matrix tbody th small {
   display: block;
+  margin-top: 0.1rem;
   font-weight: 400;
-  font-size: 0.75rem;
-  color: #666;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
-/* One rule for the three lower sections: the rule above each one is what makes
-   the four story steps visible as steps while scrolling. */
-.stats,
-.findings,
-.improvements {
-  margin-top: 2.5rem;
-  border-top: 1px solid #ddd;
-  padding-top: 1.5rem;
+.stats tbody tr:last-child th,
+.stats tbody tr:last-child td,
+.improve tbody tr:last-child th,
+.improve tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 /* auto-fit + minmax: the cards lay themselves out at whatever width they have --
@@ -372,7 +690,7 @@ main h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: 0.75rem;
-  margin: 1.5rem 0;
+  margin: 1.25rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -386,11 +704,10 @@ main h2 {
    A column flexbox rather than `display: block`, for one specific reason a
    screenshot shows better than the CSS does: a <button> centres its contents
    vertically by default, and the grid stretches all four cards to the tallest
-   one. So with `display: block` the four headings rendered 20px apart -- Quick
-   sort's longer finding pushed its heading up, Bubble's shorter one pushed its
-   heading down -- and a row of four parallel findings didn't read as a row.
-   `flex-start` pins the headings to a shared top; `margin-top: auto` on the
-   label below then pushes every "Try:" line to a shared bottom. */
+   one. So with `display: block` the four headings rendered 20px apart, and a
+   row of four parallel findings didn't read as a row. `flex-start` pins the
+   headings to a shared top; `margin-top: auto` on the label below then pushes
+   every "Try:" line to a shared bottom. */
 .cards .card {
   display: flex;
   flex-direction: column;
@@ -398,111 +715,135 @@ main h2 {
   justify-content: flex-start;
   width: 100%;
   height: 100%;
-  text-align: left;
+  padding: 0.9rem;
+
+  /* --control-line, not the softer --line the section surfaces use: the whole
+     card is a <button>, and WCAG 1.4.11 asks 3:1 of the boundary that tells you
+     a control is there. A card edge drawn in --line measures 1.25:1. */
+  border: 1px solid var(--control-line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
   font-family: inherit;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  padding: 0.75rem;
-  border: 2px solid #ddd;
-  border-radius: 0.5rem;
-  background: #fff;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: left;
   color: inherit;
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
 }
 
 .cards .card strong {
   display: block;
-  font-size: 0.95rem;
+  font-size: var(--text-base);
+  letter-spacing: -0.01em;
 }
 
 /* Same treatment as the statistics table's row notes, because it is the same
    qualifier doing the same job -- "these numbers are about OUR bubble sort". */
 .cards .card .card-variant {
   display: block;
+  margin-top: 0.1rem;
   font-weight: 400;
-  font-size: 0.75rem;
-  color: #666;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
 /* Amendment 8 swapped these two. The finding is now the card's body text in the
-   ordinary ink, and the improvement is the blue line under it -- so the card
+   ordinary ink, and the improvement is the accent line under it -- so the card
    reads discovery-then-proposal top to bottom, which is the order the DOM is in
-   too. It used to be the other way round. */
+   too. */
 .cards .card .card-finding {
   display: block;
-  margin-top: 0.35rem;
-  color: #333;
+  margin-top: 0.5rem;
+  color: var(--ink-2);
 }
 
 /* `auto` top margin: takes whatever vertical space is left in the card, so the
    proposal sits at the bottom edge and the four line up across the row. On a
    phone each card is only as tall as its own content, so there is no space to
-   take and this behaves exactly like the 0.4rem it replaces. */
+   take and this behaves exactly like the padding it replaces. */
 .cards .card .card-label {
   display: block;
   margin-top: auto;
-  padding-top: 0.4rem;
-  color: #0b5fff;
+  padding-top: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 600;
-}
-
-.cards .card:hover {
-  border-color: #999;
-}
-
-/* The chosen card and the area below it share the blue, so it is visible which
-   card the one race area is currently showing. */
-.cards .card[data-selected="true"] {
-  border-color: #0b5fff;
-  background: #f5f8ff;
+  color: var(--accent-ink);
 }
 
 .cards .card:disabled {
-  opacity: 0.6;
+  box-shadow: none;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
+/* The chosen card and the area below it share the accent, so it is visible
+   which card the one race area is currently showing. Same three-part treatment
+   as the winning panel -- ring, tint, lift -- so "this one is selected" and
+   "this one won" are recognisably the same kind of emphasis. */
+.cards .card[data-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow:
+    0 0 0 3px rgb(11 95 255 / 12%),
+    0 10px 24px -14px rgb(11 95 255 / 45%);
+}
+
+.cards .card:hover:not(:disabled) {
+  border-color: var(--control-line);
+  box-shadow: var(--shadow-md);
+}
+
+/* The improvement race is a well inside the Improvements surface: recessed
+   rather than raised, because it is a workspace within that section rather
+   than a fifth section. Its own panels then come back up to white, so the
+   nesting reads surface -> well -> surface. */
 .improve {
-  border: 1px solid #ddd;
-  border-radius: 0.5rem;
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   padding: 1.25rem;
-  background: #fafafa;
+  background: var(--surface-2);
 }
 
 .improve h3 {
-  margin-top: 0;
-  font-size: 1.05rem;
+  margin: 0;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
 }
 
-.improve .panel {
-  background: #fff;
+/* Inside the well, the controls strip would be grey-on-grey, so it flips to
+   white -- the same "one step away from my container" rule the panels follow. */
+.improve .controls {
+  margin: 1rem 0;
+  background: var(--surface);
 }
 
 .improve .panel h4 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
+  margin: 0 0 0.85rem;
+  font-size: var(--text-base);
+  letter-spacing: -0.01em;
 }
 
 .improve .panel h4 small {
   display: block;
+  margin-top: 0.1rem;
   font-weight: 400;
-  font-size: 0.75rem;
-  color: #666;
-}
-
-/* Only the margin differs now -- alignment and wrapping moved to the shared
-   `.controls` rule in Amendment 9. */
-.improve .controls {
-  margin: 1rem 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
 /* .improve-finding was here until Amendment 8. It repeated the chosen card's
    finding under this heading, and the finding is now the card's own main text
    with the chosen card highlighted just above -- so it was duplication. */
 .improve-change {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
-  color: #555;
+  margin: 0.4rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
 
 /* .improve-shape was here until Amendment 9. It styled the sentence "Both sides
@@ -510,36 +851,74 @@ main h2 {
    selector was up to 3,000px above this race. There is a selector in this row
    now, so the sentence went with it. */
 
-.improve-expect {
-  margin: 1.25rem 0 0;
-  border-left: 3px solid #ddd;
-  padding-left: 0.75rem;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: #555;
+/* The animation IS the explanation here, so this does not disable it -- the
+   race is driven by setTimeout in the module, not by CSS, and turning the bar
+   transition off simply makes each step land instantly instead of easing.
+   What it does remove is the decorative motion: hovers, lifts and colour
+   fades that carry no information. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media (width <= 640px) {
   body {
-    padding: 1rem;
+    padding: 1.25rem 1rem 2.5rem;
+  }
+
+  .race,
+  .stats,
+  .findings,
+  .improvements {
+    border-radius: var(--r-md);
+    padding: 1.1rem;
+  }
+
+  /* The area holds two stacked panels on a phone, so its own padding comes down
+     to keep the pair inside one scroll of the finding that opened it. */
+  .improve {
+    padding: 0.85rem;
   }
 
   .panels {
     grid-template-columns: 1fr;
   }
 
-  /* The area holds two stacked panels on a phone, so its own padding comes down
-     to keep the pair inside one scroll of the finding that opened it. */
-  .improve {
-    padding: 0.75rem;
-  }
-
-  /* Amendment 9: 9rem in BOTH races. The improvement race was already 9rem here
-     while the main race stayed at 13rem, so the same animation ran at two sizes
-     on the screen where the difference is most obvious. Unified downwards --
-     sixteen bars still read clearly at 160px tall across a 296px box, and the
-     phone page loses about 96px, which is the direction "compact" points. */
+  /* Amendment 9: 9rem in BOTH races. Sixteen bars still read clearly at 160px
+     tall across a 296px box, and the phone page loses about 96px, which is the
+     direction "compact" points. */
   .bars {
     height: 9rem;
+  }
+
+  /* The controls strip is three wrapped rows at this width; the extra padding
+     that frames it on a desktop just makes it taller here. */
+  .controls {
+    padding: 0.6rem 0.7rem;
+  }
+
+  /* The improvement table is the narrowest box on the page: it sits inside the
+     improvement well, inside the Improvements card, so it pays for two lots of
+     padding that the statistics table does not. Measured at 390px it wanted
+     337px of a 321px slot and spilled 16px out of the card -- which my "no
+     horizontal overflow" check missed, because the DOCUMENT did not overflow;
+     only the card did. The three rules below give the columns back about 50px
+     by cutting cell padding and the header's letter-spacing, which is width
+     spent on styling rather than on data. */
+  .matrix th,
+  .matrix td {
+    padding: 0.5rem 0.4rem;
+  }
+
+  .stats thead th,
+  .improve thead th {
+    letter-spacing: 0.02em;
+  }
+
+  .matrix tbody th {
+    font-size: var(--text-xs);
   }
 }

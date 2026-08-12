@@ -110,6 +110,11 @@
         <button type="button" data-testid="stats-button">
           Run 20 arrays of each shape
         </button>
+        <!-- The scroll wrapper is a floor, not the normal case: at 390px the
+             table is sized to fit. Below about 330px its four columns hit a
+             minimum width, and without this the table would spill out of the
+             white card instead of scrolling inside it. -->
+        <div class="table-scroll">
         <table class="matrix">
           <caption>
             <span data-testid="stats-scope"
@@ -123,6 +128,7 @@
           <thead data-testid="stats-head"></thead>
           <tbody data-testid="stats-body"></tbody>
         </table>
+        </div>
         <p class="variants" id="variant-detail">
           Two rows say more about our code than about the algorithms: our
           <strong>bubble sort</strong> has no early exit, so its average never
@@ -217,6 +223,7 @@
           <button type="button" class="rerun" data-testid="improve-rerun" disabled>
             Run 20 more arrays
           </button>
+          <div class="table-scroll">
           <table class="matrix" data-testid="improve-stats">
             <caption>
               <span data-testid="improve-stats-scope"></span>
@@ -226,6 +233,7 @@
             <thead data-testid="improve-stats-head"></thead>
             <tbody data-testid="improve-stats-body"></tbody>
           </table>
+          </div>
         </section>
       </section>
     </main>

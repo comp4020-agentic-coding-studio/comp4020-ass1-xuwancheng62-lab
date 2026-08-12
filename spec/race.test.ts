@@ -1975,6 +1975,27 @@ describe("the shipped index.html", () => {
     expect(html, "the fixed shape sentence is still in the page").not.toContain("improve-shape\"");
   });
 
+  // Amendment 10a. A table of four number columns has a width it cannot go below,
+  // and the improvement one sits two boxes deep, so at 390px it was 16px wider
+  // than its slot and drew outside the white card. The CSS brings it down to fit;
+  // this asserts the floor underneath that -- both tables live in a box that can
+  // scroll -- because the CSS fit is a measurement that a future font change or a
+  // longer variant label could quietly break, and JSDOM cannot measure anything.
+  // What it CAN check is that the escape hatch is still wired up.
+  it("keeps both statistics tables in a box that can scroll", () => {
+    const dom = new JSDOM(html);
+    const { document } = dom.window;
+    const tables = [...document.querySelectorAll("table.matrix")];
+
+    expect(tables.length, "expected the two statistics tables").toBe(2);
+    for (const table of tables) {
+      expect(
+        table.parentElement?.classList.contains("table-scroll"),
+        `a .matrix table is not wrapped in .table-scroll (${table.getAttribute("data-testid") ?? "stats"})`,
+      ).toBe(true);
+    }
+  });
+
   // The findings section holds the discoveries; the improvements section holds the
   // fixes and the race. Keeping them apart is the page-level half of "finding
   // first, then the proposed improvement".
