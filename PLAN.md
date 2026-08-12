@@ -200,6 +200,113 @@ effect of the work above unless correctness requires it:
   open deliberately; to be decided by looking at it once (4) is built, not
   guessed at now.
 
+## Amendment 2 — V1.2: insertion sort, speed control, multi-run stats
+
+Requested as one iteration after testing V1.1. All three items trip the
+trigger test (a new algorithm in the selector, two new things the reader can
+do), so they are planned here before implementation.
+
+### 1. Insertion Sort as a fourth option
+
+Amendment to the frozen plan's deferral. The plan deferred Insertion as
+"redundant as a fourth O(n²) example next to Bubble unless it's given its own
+hook." Measured over 2000 random 16-item arrays, that is only partly right:
+
+| Algorithm | Average comparisons (n=16) | Fewest-comparison wins |
+| --- | --- | --- |
+| Bubble | 120.0 | 0 / 2000 |
+| Insertion | 72.6 | 5 / 2000 |
+| Quick | 50.8 | 448 / 2000 |
+| Merge | 45.7 | 1547 / 2000 |
+
+Insertion uses ~40% fewer comparisons than Bubble on the same random input,
+because it stops its inner scan as soon as the value is in place while our
+Bubble has no early exit. That is a real, visible difference, so it earns a
+place without the nearly-sorted toggle. **What is still deferred is its
+adaptivity story** — "fast when the data is already nearly sorted" — which
+genuinely needs an input-shape control and is not in this iteration.
+
+**It must be swap-based, not shift-based.** The textbook version saves the key
+to a variable and shifts values right, which leaves the key's old slot holding
+a copy — measured at **119881 of 119881 shift frames showing a duplicate
+value, i.e. 100%**. That is the same class of defect as the Merge Sort bug in
+Amendment 1. Walking the value down with adjacent swaps is permutation-safe at
+every frame and produces an identical comparison count. The existing
+permutation test covers it automatically, and would fail loudly on the naive
+version.
+
+Highlighting: `compared: [j, j + 1]`, the same as Bubble. The two then differ
+by *motion* rather than colour — Bubble's pair crawls rightward across the
+whole array, Insertion's walks leftward from a growing sorted prefix. Marking
+that sorted prefix with a third role would make the difference plainer; not
+doing it in this iteration, noted as an option.
+
+### 2. Speed control
+
+A single `range` input labelled Slow → Fast, sitting with the existing
+controls. No new section.
+
+- Expressed as **steps per second** so that dragging right means faster:
+  range 2–50, default 10, giving a delay of `1000 / rate` — 500ms at the slow
+  end, 20ms at the fast end, and **100ms at the default**, unchanged from
+  V1.1.
+- **Adjustable mid-race**, as asked. This works without restarting anything
+  because each step schedules the next one, so reading the current rate at
+  schedule time is enough — no change to the animation model.
+- The slider stays enabled while the race runs, unlike the other two controls.
+
+### 3. Multi-run statistics
+
+A button that runs all four algorithms over **20 shared random arrays** and
+fills a small table: average comparisons per algorithm, and how often each
+used the fewest comparisons.
+
+- Runs by draining the same generators the animation uses, so there is one
+  source of truth for what a comparison is. No animation, no timers: ~6000
+  steps total, which is a few milliseconds, so it can be synchronous without
+  blocking anything perceptibly.
+- Every algorithm sees the identical 20 arrays, so the comparison is paired.
+- **The wording has to stay precise.** This measures *comparisons under these
+  inputs*, not runtime and not "speed". The table's caption says so, in those
+  terms: it counts comparisons on 20 random shuffles of 16 items, and says
+  nothing about wall-clock time, memory, cache behaviour, or how these perform
+  on larger or differently-shaped inputs. No claim that one algorithm is
+  "fastest".
+- Ties on fewest comparisons are counted for every algorithm that ties, and
+  the caption notes it, so the win counts can exceed 20.
+
+### Decision this iteration forces — the meaning of "winner"
+
+Reported at the end of V1.1 and now unavoidable. The live race marks the panel
+that finishes **animating** first, which is decided by frame count; the panel
+reports **comparisons**. Those disagree in **112 of 500 Merge-vs-Quick races
+(22%)**, because Merge emits an extra frame per merge tail and Quick an extra
+frame per pivot placement. Frame count is an artefact of how we chose to emit
+frames, not a property of the algorithm.
+
+A stats table that ranks by fewest comparisons while the border ranks by
+frames would put two contradicting definitions of "better" on one page. So
+this iteration picks one.
+
+**Decided: the border means fewest comparisons**, awarded once both panels
+finish, matching the counters and the stats table and the page's whole point of
+view. Frame count stops being a ranking anywhere on the page. Accepted cost:
+the border no longer reflects which animation you literally watched end first,
+which with a speed slider was never a property of the algorithm anyway. On a
+tie both panels are marked, rather than inventing a tiebreak.
+
+**Decided: no sorted-prefix marker for Insertion** in this iteration — exactly
+the "same comparison highlighting" as the others. Whether motion alone
+distinguishes Insertion from Bubble is a judgement call to make by watching
+V1.2, and a third role stays available if it doesn't.
+
+### Explicitly unchanged
+
+Bubble's missing early exit (its 120.0 average is exactly the constant from
+Amendment 1), input-shape variations, the dead CSS transition, the two-panel
+structure, and the four frozen decisions. Insertion is a fourth *option*, not
+a third panel.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
@@ -209,6 +316,17 @@ effect of the work above unless correctness requires it:
 - **Machine-checked, added by Amendment 1:** every yielded frame of every
   algorithm is a permutation of the starting array. Starts red against the
   current Merge Sort.
+- **Machine-checked, added by Amendment 2:** the permutation and
+  compared/pivot-index tests extend to Insertion Sort for free, since both loop
+  over every registered algorithm — adding the algorithm to the map is enough to
+  put it under test. Plus: a race still completes when the speed slider is moved
+  mid-run, and the stats run reports one row per algorithm with an average
+  strictly between the best and worst possible comparison counts.
+- **Judgement only, added by Amendment 2:** whether Insertion and Bubble read as
+  *different strategies* rather than two slow ones, given they share the same
+  highlight colour and differ only in the direction their pair travels; and
+  whether the stats table's caption is precise enough that nobody leaves
+  thinking it measured runtime.
 - **Machine-checked, next step:** the core-interaction contract from "Design
   decisions forced by the spec" — triggering Race ends both panels'
   bar-height sequences in non-decreasing order, with each panel's comparison
