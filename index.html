@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>COMP4020 prototype</title>
+    <title>Sorting race — watch the cost happen</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,11 +13,44 @@
       </nav>
     </header>
     <main>
-      <h1>COMP4020 prototype</h1>
-      <p data-testid="intro">
-        Replace this with your prototype. This week's brief is on the course website;
-        <code>spec/README.md</code> explains how the checks in this repo relate to it.
+      <h1>Sorting race</h1>
+      <p>
+        Bubble, merge and quick sort all solve the same problem: put these
+        bars in order, shortest to tallest. Pick one for each side, press
+        <strong>Race</strong>, and watch how differently they get there —
+        same bars, same shuffle, wildly different amounts of work.
       </p>
+
+      <div class="controls">
+        <button type="button" data-testid="shuffle-button">New shuffle</button>
+        <button type="button" data-testid="race-button">Race</button>
+      </div>
+
+      <div class="panels">
+        <section class="panel" data-testid="panel-a">
+          <h2>Side A</h2>
+          <label>
+            Algorithm
+            <select data-testid="algorithm-select-a"></select>
+          </label>
+          <div class="bars" data-testid="bars-a"></div>
+          <p class="status">
+            <output data-testid="counter-a">0</output> comparisons
+          </p>
+        </section>
+
+        <section class="panel" data-testid="panel-b">
+          <h2>Side B</h2>
+          <label>
+            Algorithm
+            <select data-testid="algorithm-select-b"></select>
+          </label>
+          <div class="bars" data-testid="bars-b"></div>
+          <p class="status">
+            <output data-testid="counter-b">0</output> comparisons
+          </p>
+        </section>
+      </div>
     </main>
     <script type="module" src="./main.ts"></script>
   </body>
