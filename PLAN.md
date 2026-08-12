@@ -597,6 +597,184 @@ winner by fewest comparisons, highlighting, speed slider), the 20-run sample
 size, and the array length of 16. Still no Bubble early exit, no alternative
 Quick pivots, no Bogo Sort, and the dead CSS transition still stays.
 
+## Amendment 5 — V1.5: does the improvement help? (13 August 2026)
+
+Approved direction, with three changes made by me on review: keep Merge as an
+honest experiment rather than reframing it as "no improvement exists", use a
+**random pivot** for Quick rather than the middle element, and fix the
+incorrect Bubble claim from the measured result. Implementation authorised in
+the same message, so this amendment is the record of what was built, written
+before the code.
+
+### The gap this closes
+
+V1.4 established that the ranking rearranges with the input shape. But every
+number on the page is still a property of *our four implementations*, and two of
+those implementations are deliberately weak — Bubble has no early exit, Quick
+takes the last element as its pivot. The page says so honestly, and then leaves
+the reader with a note instead of evidence. A reader cannot check the claim
+"a better pivot would fix this"; they can only be told it.
+
+This iteration turns the four variant caveats into four experiments the reader
+can run. The finding is not "improved is faster" — measured below, that is false
+for two of the four. The finding is that **an improvement is only an improvement
+relative to an input shape**, which is the same argument as V1.4 aimed one level
+up: at the code rather than the data.
+
+### The structure
+
+Four compact **What we found** cards after the statistics, one per algorithm.
+Clicking a card loads that algorithm into **one shared Original vs Improved
+race** below, both sides on the identical array:
+
+**Choose a finding → Original vs Improved → Race**
+
+Not four race sections, and no improved variant in the main race — both were
+explicit instructions and both are structural below, not conventions.
+
+### The four improvements, chosen on measurement
+
+Ten candidates were measured before these four were picked. Means over **5000
+arrays per shape**, 16 items, counted through the same generators that will
+animate, with each improvement's own bookkeeping comparisons **included** —
+pivot selection and skip tests are work, and excluding them would rig the race
+they appear in.
+
+| Improvement | Random | Nearly sorted | Nearly reversed |
+| --- | --- | --- | --- |
+| Bubble **+ early exit** | 120.0 → 113.4 | 120.0 → **67.4** | 120.0 → 120.0 |
+| Insertion **+ binary search** | 72.7 → **45.0** | 24.9 → *40.6* | 115.1 → **48.4** |
+| Merge **+ skip ordered runs** | 45.7 → *55.3* | 36.9 → **32.0** | 36.9 → *50.9* |
+| Quick **+ random pivot** | 50.9 → 50.9 | 94.8 → **51.0** | 90.9 → **50.9** |
+
+Four different answers to one question, which is why these four:
+
+1. **Bubble + early exit — the fix works, and only where the fault was.** Stop
+   when a pass makes no swaps. This is the specific code that produces the flat
+   120.0 in all three columns, the most misleading number on the page. It cuts
+   nearly-sorted input by 44%, and does essentially nothing on nearly-reversed
+   input (tied on 98% of arrays), because a value that must travel *left* moves
+   only one position per pass, so a nearly-reversed array still needs nearly
+   every pass. It never costs more than the original: 0 losses in 400,000
+   arrays.
+2. **Insertion + binary search — the improvement trades.** Binary-search the
+   insertion point instead of walking down. It cuts random by 38% and
+   nearly-reversed by 58%, and is **63% worse on nearly-sorted input** (worse on
+   99.9% of arrays), because it gives up the early break that made Insertion the
+   nearly-sorted champion in exchange for a near-constant 38–49 comparisons on
+   any input. This is the most valuable card on the page: paying comparisons to
+   buy predictability is a real engineering trade, not a mistake.
+3. **Merge + skip ordered runs — the experiment that fails on two of three
+   shapes, kept as an experiment.** One comparison asks whether the two sorted
+   runs are already in order end-to-end, and skips the whole merge when they
+   are. It targets Merge's one real weakness — it is the least *adaptive* of the
+   four, swinging only 45.7 → 36.9 across shapes where Insertion swings 24.9 →
+   115.1. The skip fires on 38% of merges and is paid for on the other 62%: 13%
+   better on nearly-sorted, 21% and 38% worse on the other two. Kept, and framed
+   as what it is. Context for why nothing wins here: `ceil(log2(16!)) = 45` is
+   the proven floor for any comparison sort at this size, and our unmodified
+   Merge already averages **45.7 on random** — 0.7 comparisons from optimal.
+   There is almost nothing left to win at n=16.
+4. **Quick + random pivot — the fix is free, and its claim needs care.** Choosing
+   the pivot at random costs no comparisons at all, and flattens the shape
+   dependence completely: 50.9 / 51.0 / 50.9 across the three shapes, cutting
+   the nearly-ordered cases by 46% and 44% while leaving random unchanged
+   (50.9 → 50.9). That flatness *is* the finding — the input shape stops being
+   able to choose the pivot.
+
+### What the random pivot does not claim
+
+**It improves expected behaviour. It does not improve the worst case,** which
+stays O(n²) — a random pivot can still pick the smallest or largest value at
+every level. What changes is that no *input shape* can force that any more; it
+becomes unlikely rather than triggered. Measured, so the page can say it and
+mean it:
+
+- On random input a single run ranged **39–94** comparisons across 5000 arrays,
+  and over 20,000 runs the improved version exceeded the *original's own mean*
+  on **44.3%** of them. The worst single run cost **95** — worse than the
+  original's 50.9 average. Bad partitions still happen.
+- The same array raced 12 times produced **9.5 distinct** comparison counts on
+  average, and never once produced 12 identical results in 2000 trials per
+  shape. The variance is real and visible.
+
+**The middle element was measured and deliberately rejected.** It is better on
+our three shapes (50.8 / 41.3 / 44.5, beating the random pivot on both nearly
+shapes) and it keeps the race deterministic. It was rejected on review because
+it fixes *the shapes we happen to generate* rather than demonstrating the
+principle that matters — making a consistently bad partition unlikely. Recording
+this because the plan should show that the better number lost to the better
+argument, not that it went unnoticed. Median-of-three was also measured and is
+worse than both at this size (58.9 / 56.0 / 58.4) — its three selection
+comparisons per partition outweigh its benefit when n is 16.
+
+### Also measured and rejected
+
+- **Insertion, binary search plus a one-comparison "already in place" guard**
+  (51.4 / 29.0 / 59.1) — an attempt to keep the adaptive best case. Worse than
+  plain binary search on all three shapes, and *still* worse than the unmodified
+  Insertion on nearly-sorted. There is no free lunch here to offer.
+- **Merge, four further variants:** skip only on runs ≥ 4 (+12.1% / −15.5% /
+  +18.9%), skip only on runs ≥ 8 (+6.3% / −9.8% / +8.1%), insertion sort under 4
+  (+2.2% / −8.3% / +17.3%), insertion sort under 8 (+15.3% / −20.1% / +73.4%),
+  natural merge over existing runs (+18.6% / −9.9% / +31.5%). Every one loses on
+  two of three shapes. The skip test is kept because it is the simplest to
+  explain and targets the weakness squarely.
+
+### A claim already on the site is wrong, and this fixes it
+
+`index.html` currently states that a bubble sort with early exit "would be among
+the fastest on nearly-sorted input, not the slowest." That is false. Measured
+against the other three algorithms as shipped, an early-exit bubble sort scores
+**67.4 on nearly-sorted input and ranks 3.04 of 4** on average — ahead only of
+our last-element Quick sort (94.8), behind Insertion (24.9) and Merge (36.9). It
+ranks 4.00 of 4 on random and 3.78 on nearly-reversed.
+
+The corrected claim: early exit removes the *flat* 120, not Bubble's
+last-or-second-last place. I wrote the wrong sentence, and it stayed green
+through every check, because nothing tests what a reader concludes — the same
+failure mode the "a true number can still make a false claim" rule was added
+for. V1.5 makes it checkable in the browser for the first time, which is the
+better fix than more careful wording.
+
+### Decisions, locked
+
+1. **One shared race area, four cards.** Clicking a second card swaps the
+   contents of the same area rather than adding another — asserted by counting
+   areas in the DOM, so a regression fails rather than merely looking cluttered.
+2. **The flow is enforced, not described.** The area starts empty with its
+   controls disabled; choosing a card is what enables them. "Choose a finding
+   first" is then a property of the page, not an instruction to be ignored.
+3. **No new selectors.** The improvement race takes its shape from the existing
+   **Starting data** selector and its speed from the existing slider. The
+   selector governs races and still never touches the statistics — Amendment 4
+   stands unchanged.
+4. **One array, both sides, regenerated by New array.** Race can be pressed
+   repeatedly on the same array, which is how the random pivot's variance becomes
+   visible rather than merely asserted.
+5. **Improved variants live in a separate registry** (`IMPROVED_ALGORITHMS`),
+   keyed by the same algorithm names. The main race's dropdowns are built from
+   `SORT_ALGORITHMS`, so they *cannot* offer an improved variant — structural,
+   not a convention to be remembered.
+6. **No measured number is hard-coded into the page.** The cards state the
+   *direction* in words; every number a reader sees is computed live in their
+   browser. The measurements in this amendment are the evidence for those
+   directions, not values to be copied into markup — that is what made the
+   twelve Wikimedia URLs on crit 2 look right and 404.
+7. **Winner is fewest comparisons**, the Amendment 2 definition, unchanged. With
+   a random pivot the improved Quick side can lose a race it usually wins; that
+   is the honest display of an expected-case improvement, not a bug to smooth
+   over.
+
+### Explicitly unchanged
+
+The four original algorithms, byte for byte — every number in the statistics
+matrix must stay reproducible. The input generators, the comparison metric,
+`comparisonStats`, `shapeSample`, the statistics matrix and its methodology, the
+main race (two panels, shared array, winner by fewest comparisons, highlighting,
+locked selector mid-race), the 20-run sample size, and the array length of 16.
+No Bogo Sort, and the dead CSS transition still stays.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
@@ -649,6 +827,39 @@ Quick pivots, no Bogo Sort, and the dead CSS transition still stays.
   compressed variant line by the controls is still enough for a reader who never
   scrolls to the table; and whether the matrix at 390px is legible rather than
   merely fitting.
+- **Machine-checked, added by Amendment 5:** every frame of every *improved*
+  variant is a permutation of the starting array, for every shape — pre-measured
+  as 0 bad frames in 499,989 frames, so this is standing backpressure rather
+  than a fix for a known bug — and each improved variant leaves the array
+  sorted. The improved variants are absent from the main race's registry and
+  from both dropdowns, which is the machine-checked form of "no improved variants
+  in the main race". Four cards exist, one per algorithm; clicking one loads that
+  algorithm into the single shared area, and clicking a second swaps it rather
+  than adding a second area (asserted by counting areas). The area's controls are
+  disabled until a card is chosen. Both sides of the improvement race receive an
+  identical array, and its shape follows the Starting data selector. Plus the
+  measured directions, each verified over 5000 samples of 20 arrays and each
+  holding 5000/5000 with the smallest observed margin in brackets: bubble+early
+  beats bubble on nearly sorted (27.15); insertion+binary beats insertion on
+  random (20.05) and nearly reversed (62.10) and **loses** on nearly sorted
+  (12.00); merge+skip beats merge on nearly sorted (1.20) and **loses** on random
+  (7.80) and nearly reversed (13.45); quick+random beats quick on nearly sorted
+  (29.35) and nearly reversed (23.45). Two further contracts needed a measured
+  bound rather than an equality: bubble+early never uses *more* comparisons than
+  bubble (0 in 400,000 arrays) and its nearly-reversed saving stays within 1
+  comparison of zero (largest observed 0.20 over 20,000 samples of 20 — the tie
+  is not exact, so asserting equality would have been a flake waiting to
+  happen); and quick+random is non-deterministic, asserted as 12 races of one
+  array yielding at least two distinct counts (12 identical never observed in
+  6000 trials).
+- **Judgement only, added by Amendment 5:** whether "improved" reads as a fair
+  test rather than a victory lap, given two of the four improvements lose;
+  whether the Insertion card's honest loss is understood as a trade rather than
+  as a bug in the page; whether the random pivot's visible variance reads as "the
+  data can no longer force a bad case" rather than "this code is flaky"; whether
+  four cards plus a second race area still navigate at 390px; and whether the
+  flow — choose a finding, then compare, then race — is discoverable without
+  being told.
 - **Machine-checked, next step:** the core-interaction contract from "Design
   decisions forced by the spec" — triggering Race ends both panels'
   bar-height sequences in non-decreasing order, with each panel's comparison
