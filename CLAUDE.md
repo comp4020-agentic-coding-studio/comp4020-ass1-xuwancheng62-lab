@@ -57,6 +57,17 @@ like good practice.
   [Planning and human--agent decision making](#planning-and-humanagent-decision-making),
   the place to raise it is `PLAN.md` before you build --- not a note in the diff
   afterwards.
+- **Images I hand you are yours to prepare.** When I drop a picture in the folder
+  for the site to use, resizing, cropping, compressing and converting it are
+  implementation detail --- do them and tell me the numbers, don't ask first. On
+  assignment 1 I gave you a 1254×1254, 1.1MB PNG for an icon that renders at
+  48px; the version worth shipping was 160px and 22KB, and the crop that made the
+  artwork legible at that size came off the file's own alpha bounds. None of that
+  needed my approval, and asking would only have slowed it down. Two things this
+  does **not** cover, and both still go through the trigger test: taking colours
+  out of an image and putting them on the page is a change to the palette, not
+  asset preparation; and my original file stays where I put it until I say
+  otherwise --- offer to bin it, don't bin it.
 - **Explain mechanisms I can't audit.** I don't know web development. When you use
   a mechanism I'm unlikely to recognise --- CSS sibling selectors, `:checked`
   state, grid, container queries --- leave a short comment saying what it does and
