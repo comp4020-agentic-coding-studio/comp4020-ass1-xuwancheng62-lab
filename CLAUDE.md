@@ -228,11 +228,26 @@ running counts as not green, so ship with time for CI to finish.
   blocks any commit containing something shaped like an API key --- by the time
   CI sees a key it's already pushed, so the hook is the sensor that matters.
 
-Nothing here measures **accessibility** or **performance** --- wiring those
-sensors (`axe-core`, Lighthouse, or whatever you choose) is your work, and later
-in the course the spec will ask you to show how you tested both. When you do,
-read a green performance result honestly: it's a lab estimate from one run on a
-CI machine, not proof the site is fast for real users.
+- **accessibility** (`spec/a11y.test.ts`) --- mine, not the template's. axe-core
+  over the built page, scanned twice: as delivered, and again with the
+  statistics panel and a findings card open, because most of this page doesn't
+  exist until you click. It reads **semantics only**. jsdom has no layout, so
+  `color-contrast` is switched off there rather than left to report a
+  misleading pass --- contrast is checked by hand and the ratio is written
+  beside the colour it describes. A dangling `aria-labelledby` is reported by
+  axe as *incomplete* rather than a violation, so a separate test asserts every
+  ARIA reference resolves. Adding it is what taught me the real rule: **a
+  sensor is worth nothing until I have watched it go red.** I broke the built
+  page six ways --- stripped label, emptied button, missing alt, bogus aria-*,
+  dangling IDREF, nameless control --- and confirmed each one fails before
+  keeping the green.
+
+**Performance** still has no sensor, and a green accessibility run is not "the
+page is accessible" --- it means no *machine-checkable* failure, over the part
+of the page a DOM can see. Keyboard order, focus visibility and behaviour under
+a mid-interaction resize are checked by hand in a real browser. When I do wire
+performance, read a green result honestly: it's a lab estimate from one run on
+a CI machine, not proof the site is fast for real users.
 
 ## The stack is swappable
 
