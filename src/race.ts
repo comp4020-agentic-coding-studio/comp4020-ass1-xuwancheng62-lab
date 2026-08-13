@@ -90,6 +90,35 @@ function renderBars(
   );
 }
 
+/**
+ * Amendment 11. Writes the slider's position onto the element as `--fill`, a
+ * percentage the stylesheet reads to colour the travelled part of the track.
+ *
+ * This exists because filling a range track is not something a browser does on
+ * its own: Firefox exposes ::-moz-range-progress, Chrome and Safari expose
+ * nothing equivalent, so the one thing that works everywhere is a gradient whose
+ * stop we move ourselves. Called once at startup as well as on every input, or
+ * the track would sit empty until the first drag.
+ */
+function paintTrackFill(slider: HTMLInputElement): void {
+  const min = Number(slider.min);
+  const max = Number(slider.max);
+  const value = Number(slider.value);
+  // A slider with no min/max (or a broken one) fills to nothing rather than to
+  // NaN%, which the browser would drop -- leaving a plain track, not a stripe
+  // in the wrong place.
+  const span = max - min;
+  const fraction = Number.isFinite(span) && span > 0 ? (value - min) / span : 0;
+  const clamped = Math.min(1, Math.max(0, fraction));
+  slider.style.setProperty("--fill", `${(clamped * 100).toFixed(2)}%`);
+}
+
+/** Paint now, and again on every move. */
+function trackFill(slider: HTMLInputElement): void {
+  paintTrackFill(slider);
+  slider.addEventListener("input", () => paintTrackFill(slider));
+}
+
 export function initRace(root: ParentNode): void {
   const document = root.ownerDocument ?? (root as Document);
   const panels = { a: getPanelRefs(root, "a"), b: getPanelRefs(root, "b") };
@@ -113,6 +142,8 @@ export function initRace(root: ParentNode): void {
   ) {
     throw new Error("race controls are missing required markup");
   }
+
+  trackFill(speedSlider);
 
   let sharedArray: number[] = [];
   let racing = false;
@@ -364,6 +395,11 @@ export function initRace(root: ParentNode): void {
       variant: need('[data-testid="improve-variant-improved"]'),
     },
   };
+  // The same treatment as the main race's slider. Amendment 6 gave this race its
+  // own slider so each one sits next to what it drives; two sliders that look
+  // different would undo that.
+  trackFill(improveSpeed);
+
   const IMPROVE_SIDES = ["original", "improved"] as const;
   type ImproveSide = (typeof IMPROVE_SIDES)[number];
 

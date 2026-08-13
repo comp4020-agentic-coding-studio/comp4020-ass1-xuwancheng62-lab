@@ -351,6 +351,11 @@ main > p {
 .shape,
 .speed {
   display: flex;
+
+  /* Lets these clusters narrow below their content width, which is what allows
+     the slider below to actually reach its min-width on a small screen. Without
+     it a flex item floors at its content size and the shrink is ignored. */
+  min-width: 0;
   gap: 0.5rem;
   align-items: center;
   font-size: var(--text-sm);
@@ -406,43 +411,91 @@ main > p {
    does not recognise one name discards the WHOLE rule, so -webkit- and -moz-
    get identical declarations in separate rules on purpose. */
 .speed input[type="range"] {
+  /* Amendment 11: how much of the track is filled, as a percentage. The browser
+     will not work this out for us -- Chrome has no equivalent of Firefox's
+     ::-moz-range-progress -- so race.ts writes the value here on every input
+     event and the gradients below read it back. The 0% default is what a
+     stylesheet loaded without its script would show. */
+  --fill: 0%;
+
   appearance: none;
-  width: 7rem;
-  height: 1.25rem;
+
+  /* 9rem is the width it wants; the shrink is not decoration. At a fixed 9rem
+     the cluster pushed 25px out of the controls strip at 320px wide -- found in
+     the browser, not in this file. So: ask for 9rem, allow shrinking to 4.5rem
+     when the row is tight, and never grow past 9rem.
+
+     It has to be `width`, not `flex-basis`. A flex-basis is invisible to the
+     parent's own width calculation, so `.speed` sized itself around Chrome's
+     DEFAULT 129px range input and then squeezed the slider back down to 129px
+     to fit -- 15px short, on a row with 150px to spare. A `width` is counted,
+     and shrinks just the same when there is no room. Measured, not assumed. */
+  width: 9rem;
+  flex: 0 1 auto;
+  min-width: 4.5rem;
+  height: 1.5rem;
   background: none;
   cursor: pointer;
 }
 
+/* The track was 0.3rem of --surface-3 on a --surface-2 strip: 1.07:1, which is
+   not a subtle track, it is an invisible one. Now the travelled part is filled
+   in --accent (4.83:1 against the strip) and the rest is ringed in
+   --control-line, the token that exists for exactly this -- "3:1, because this
+   border is the only thing saying it is a control".
+
+   Two hard stops at the same position, not a blend: a gradient that fades would
+   put the boundary nowhere in particular, and the boundary IS the reading. */
 .speed input[type="range"]::-webkit-slider-runnable-track {
-  height: 0.3rem;
+  height: 0.5rem;
   border-radius: var(--r-pill);
-  background: var(--surface-3);
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 var(--fill),
+    var(--surface-3) var(--fill) 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--control-line);
 }
 
 .speed input[type="range"]::-moz-range-track {
-  height: 0.3rem;
+  height: 0.5rem;
   border-radius: var(--r-pill);
-  background: var(--surface-3);
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 var(--fill),
+    var(--surface-3) var(--fill) 100%
+  );
+  box-shadow: inset 0 0 0 1px var(--control-line);
 }
 
+/* 1.5rem = 24px, the WCAG 2.5.8 minimum target. It was 15.2px, on the one
+   control here you have to hit while it is moving. The negative margin centres
+   it on the track: (0.5rem track - 1.5rem thumb) / 2. */
 .speed input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 0.95rem;
-  height: 0.95rem;
-  margin-top: -0.325rem;
-  border: 2px solid var(--surface);
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: -0.5rem;
+  border: 3px solid var(--surface);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: var(--shadow-sm);
 }
 
 .speed input[type="range"]::-moz-range-thumb {
-  width: 0.95rem;
-  height: 0.95rem;
-  border: 2px solid var(--surface);
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 3px solid var(--surface);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: var(--shadow-sm);
+}
+
+/* The scale ends, not the label. They were the same size and colour as the word
+   "Speed", which left the label reading as the first of three equal words. */
+.speed [aria-hidden="true"] {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
 .panels {

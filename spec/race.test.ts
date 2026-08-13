@@ -367,6 +367,37 @@ describe("the race", () => {
     }
   });
 
+  // Amendment 11. The filled part of the track is a gradient stop the browser
+  // will not move for us, so race.ts writes the position onto the element as
+  // --fill. If that ever stops firing the track goes plain grey and stays there
+  // -- a slider that looks perfectly fine in a screenshot while no longer
+  // showing its own value. Hence a test rather than another look at it.
+  it("keeps the slider's filled track in step with its value", () => {
+    const dom = new JSDOM(RACE_HTML);
+    const { document } = dom.window;
+    initRace(document);
+
+    for (const testid of ["speed-slider", "improve-speed"]) {
+      const slider = document.querySelector(`[data-testid="${testid}"]`) as HTMLInputElement;
+
+      // 2..50 with the value at 10: eight forty-eighths along, painted before
+      // anyone has touched it.
+      expect(slider.style.getPropertyValue("--fill"), `${testid} was not painted at startup`).toBe(
+        "16.67%",
+      );
+
+      for (const [value, fill] of [
+        ["2", "0.00%"],
+        ["26", "50.00%"],
+        ["50", "100.00%"],
+      ]) {
+        slider.value = value;
+        slider.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+        expect(slider.style.getPropertyValue("--fill"), `${testid} at ${value}`).toBe(fill);
+      }
+    }
+  });
+
   // The slider is only useful if it takes effect on a race already running,
   // which is why race.ts reads it when scheduling each frame instead of
   // capturing it at the start. A race that stalled after the change would still
