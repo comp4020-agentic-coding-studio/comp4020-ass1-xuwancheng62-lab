@@ -138,6 +138,49 @@ h1 .mark {
   width: auto;
 }
 
+/* The title, painted in the icon's colours.
+
+   HOW IT WORKS: a gradient is normally a background, sitting BEHIND the text.
+   `background-clip: text` cuts that background to the shape of the letters, and
+   `color: transparent` takes the letters' own colour away so the gradient shows
+   through them. Two declarations doing one job -- remove either and you get a
+   striped rectangle or plain black words.
+
+   WHERE THE NUMBERS COME FROM: measured, not guessed. The gap between the two
+   words sits at 60.5%-63.9% of the title's width, so the jump from amber to
+   blue is parked inside it. Blended smoothly across the letters instead, orange
+   meeting blue passes through grey and the "g" of "Sorting" came out the colour
+   of dishwater. Those percentages are ratios of the text, not pixels, so they
+   hold at every size the clamp() above produces.
+
+   WHY NOT THE ICON'S OWN COLOURS: I sampled them off the file -- #fc4d4c,
+   #fd9d1f, #2176fc, #20b986. Against this page's grey, the amber measures
+   1.92:1 and the green 2.31:1, and large text needs 3:1 (WCAG 1.4.3). These are
+   the same hues darkened until they pass: 3.99, 3.40, 3.80 and 3.74:1. */
+h1 .title {
+  background: linear-gradient(
+    90deg,
+    #e03a34 0%,
+    #c2710a 48%,
+    #c2710a 60.8%,
+    #2176fc 63.6%,
+    #2176fc 76%,
+    #0f8f66 100%
+  );
+  background-clip: text;
+  color: transparent;
+}
+
+/* Windows' high-contrast mode replaces every colour on the page with the two
+   the reader chose. It cannot see through `color: transparent`, so the title
+   would vanish entirely. This hands the words back their normal colour there --
+   the one case where losing the gradient is the correct outcome. */
+@media (forced-colors: active) {
+  h1 .title {
+    color: canvastext;
+  }
+}
+
 /* Section headings. -0.01em tracking at this size stops a system-ui heading
    looking loose next to the tighter h1. */
 main h2 {

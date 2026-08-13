@@ -1885,6 +1885,79 @@ its card, every control edge still on the 3:1 token.
 The page still has no favicon — the icon in the browser tab. Same file would do it
 in one line. Say the word.
 
+## Amendment 10c — icon2, the favicon, and a title in the icon's colours (13 August 2026)
+
+You said yes to the favicon, dropped `icon2.png` in to replace the first icon, and
+asked for the header to be colourful like it. The colour part is a palette change,
+so it went to you as a rendered preview before it went into a tracked file; you
+picked **title only**, leaving the nav pills and everything below alone.
+
+### icon2, and why it is the better file
+
+`icon2.png` is the same artwork with the rounded-square tile taken off and a real
+transparent background — `hasAlpha: yes`, and the corner pixel measures alpha
+`0.00`, both read off the file rather than assumed from looking at it. That fixes
+something the first icon did that I had accepted too easily: it drew a white
+square on a grey page.
+
+Cropped to the artwork's **measured** alpha bounding box — the drawing occupies
+875×870 inside a 1312×1199 frame, so a centred 917 square covers it — then resized
+to 160. **21.7 KB, from 430 KB.**
+
+The favicon points at that same file rather than a second one, so there is one
+image to keep in step. Vite rewrites the `href` to the hashed asset, which is what
+makes it survive the Pages subpath; checked in the built `dist/index.html`.
+
+### The title, in the icon's colours
+
+The words are wrapped in a `<span>` so the gradient has something exactly their
+size to paint. On the `<h1>` itself it would stretch across the full page width and
+only its first quarter would ever land on a letter.
+
+**The colours are the icon's, darkened.** Sampled off the file by drawing it to a
+canvas in Chrome: `#fc4d4c`, `#fd9d1f`, `#2176fc`, `#20b986`. Against this page's
+`#f4f5f7`, the amber measures **1.92:1** and the green **2.31:1** — under the 3:1
+that large text needs, so using them as they are would have been a real WCAG 1.4.3
+failure in the biggest text on the page. The gradient uses the same hues darkened
+until they pass: **3.99, 3.40, 3.80, 3.74:1**. Amber pays most for that; it reads
+burnt orange rather than the icon's bright one. That is the trade, and it is not
+one I was willing to make the other way round.
+
+**The word gap is doing structural work.** "Sorting" runs red → amber and "race"
+runs blue → green, with the jump between them parked inside the space at
+**60.5%–63.9%** of the title's width — a position measured with a DOM range, not
+guessed. Blended smoothly across the letters instead, orange meeting blue passes
+through grey and the "g" of "Sorting" came out the colour of dishwater. Two earlier
+attempts (a plateaued sRGB ramp and an OKLCH one) fixed the mud only by reordering
+the colours away from the icon's own order; parking the jump in the gap keeps the
+order and loses nothing.
+
+### One thing I flagged and you overruled, deliberately
+
+Blue, amber and green already mean things on this page — default bar, comparing
+now, in its final place. A colourful title borrows three of the four, and a reader
+could in principle take it as a key. You chose title-only over title-plus-pills,
+which is the version where that risk is smallest: a title is not a swatch, and four
+coloured chips sitting above a race legend would have been.
+
+### The check that would catch it breaking
+
+`background-clip: text` and `color: transparent` only work as a pair, and the
+failure mode that matters is neither of the obvious ones — it is the title
+rendering **invisible**, which a computed-style assertion would happily call fine.
+So the browser check reads pixels: it screenshots the title and counts distinct
+non-grey colours. Verified against the two ways it can break, rather than trusted:
+
+| Title | Colours found | Verdict |
+|---|---|---|
+| as shipped | 57 | passes |
+| gradient removed | 0 | **fails** |
+| plain ink instead | 0 | **fails** |
+
+Windows high-contrast mode gets an explicit escape (`forced-colors: active` hands
+the words back a normal colour), because it cannot see through a transparent one
+and the title would otherwise disappear entirely for the readers who need it most.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
