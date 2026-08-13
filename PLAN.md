@@ -1958,6 +1958,80 @@ Windows high-contrast mode gets an explicit escape (`forced-colors: active` hand
 the words back a normal colour), because it cannot see through a transparent one
 and the title would otherwise disappear entirely for the readers who need it most.
 
+## Amendment 11 — the speed control has to look like a control (13 August 2026)
+
+You asked for the Speed control to be more visually obvious. This is a change to
+the visual system, so it goes through the trigger test rather than straight into
+the CSS.
+
+### What I measured first
+
+Read off the rendered page at 1920 and 390, not from the stylesheet:
+
+| | Measured |
+|---|---|
+| Slider track vs. the strip behind it | **1.07:1** (`--surface-3` on `--surface-2`) |
+| Thumb | **15.2 × 15.2 px** |
+| Whole slider | 112 × 20 px |
+| The select next to it | 147 × 38 px |
+| The Race button next to it | 67 × 38 px |
+
+That first row is the finding. The track is not subtle, it is **absent** — 1.07:1
+is under the threshold at which two greys are separable at all, so the only thing
+on the strip saying "this is a slider" is a 15px dot. Every other control there
+has a border, a surface and a shadow; the speed control has none of the three,
+which is why it reads as a run of words rather than as an instrument.
+
+### The changes
+
+1. **The track gets a real presence.** Height 0.3rem → 0.5rem, and the portion to
+   the left of the thumb fills with `--accent` (**4.83:1** against the strip),
+   with the rest ringed in `--control-line` (**3.15:1** against the strip, 2.94:1
+   against the track it encloses). WCAG 1.4.11 asks 3:1 of the parts that
+   identify a control; the fill clears it outright and the ring clears it on the
+   boundary that matters, the one against the strip.
+2. **The thumb goes 15.2px → 24px**, which is the WCAG 2.5.8 minimum target size.
+   It was under it, and a slider is the one control on the page you have to hit
+   while it is moving.
+3. **The track widens**, 7rem → 9rem, so the travel is worth dragging.
+4. **`Slow` and `Fast` drop to `--text-xs` / `--ink-3`.** They are currently the
+   same size and colour as the word `Speed`, so the label doesn't read as the
+   label — it reads as the first of three equal words.
+
+Both sliders change together. The improvement race's slider is the same control
+doing the same job, and Amendment 6 chose two independent sliders rather than one
+shared value precisely so each sits next to what it drives; that argument does
+not survive them looking different.
+
+### A departure I checked before making it
+
+Amendment 10 says the primary action is filled in ink, not accent, because "a
+blue Race button beside blue bars would put the same colour on a control and on
+data". A blue track fill is the same family of decision, so I checked rather than
+assumed. It stands, for two reasons: the token's own definition authorises it
+("one accent, used for interface state AND for the default bar"), the thumb is
+already `--accent` today, and the Race button's problem was a large filled block
+of the bars' colour sitting beside the bars. An 8px bar reading left-to-right as
+a quantity is a gauge, not a competing block of data colour.
+
+### What I am not doing
+
+**No numeric readout.** The slider's value is real — it is steps per second, read
+at schedule time (`currentStepMs`) — so `10 steps/s` would be a true number. It
+still doesn't go on the page. The control's problem is that it reads as text; the
+fix cannot be a fourth piece of text. The fill answers "where am I in the range"
+graphically, which is the question `Slow`/`Fast` were already trying to answer.
+
+### How I will know it worked
+
+The fill is not something a browser draws by itself — Chrome has no equivalent of
+Firefox's `::-moz-range-progress` — so the percentage is written onto the element
+as a custom property and the gradient reads it. That is a mechanism that can
+silently stop working and leave a plain grey track, which still looks fine in a
+screenshot. So it gets a test: move the slider, assert the property tracks the
+value at both ends and in the middle. Rendered-page checks at 1920 and 390 confirm
+the measured sizes, and that the strip still doesn't overflow its card.
+
 ## What's machine-checked vs. judgement
 
 - **Machine-checked already, no new work:** the starter invariants
